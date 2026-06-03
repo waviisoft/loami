@@ -1,0 +1,33 @@
+# Rust
+/target/
+**/*.rs.bk
+*.pdb
+Cargo.lock        # keep for binaries; remove this line if/when this is published as a library crate
+
+# Node / TypeScript
+node_modules/
+dist/
+build/
+*.tsbuildinfo
+.npm/
+.pnp.*
+.yarn/*
+
+# napi-rs build artifacts
+*.node
+
+# Environment / secrets
+.env
+.env.*
+!.env.example
+
+# Loami local data backends (file:// store, caches)
+*.loami
+/.loami/
+/data/
+
+# Editor / OS
+.vscode/
+.idea/
+*.swp
+.DS_Store
