@@ -2,9 +2,10 @@ name: release
 
 # Release flow (package publishing is intentionally deferred — see the note at the bottom; it will
 # be added when there is something concrete to publish):
-#   1. Update CHANGELOG.md (and, as hygiene, the crate version in crates/loami/Cargo.toml) on main.
+#   1. Bump the crate version in crates/loami/Cargo.toml and update CHANGELOG.md (on main).
 #   2. Tag the commit: `git tag vX.Y.Z && git push origin vX.Y.Z`.
-#   3. This workflow verifies, cuts a GitHub Release, and refreshes GitHub Pages.
+#   3. This workflow verifies, checks the tag matches the crate version, cuts a GitHub Release,
+#      and refreshes GitHub Pages.
 #
 # A manual `workflow_dispatch` run executes the verify gate only (a no-op rehearsal).
 on:
@@ -31,8 +32,28 @@ jobs:
       - run: cargo clippy --all-targets --all-features -- -D warnings
       - run: cargo test --all --all-features
 
+  # The git tag (vX.Y.Z) must match crates/loami/Cargo.toml — the Cargo version has to keep up as
+  # releases are cut. Publishing-independent, so it guards every tagged release.
+  tag-version-match:
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Check tag matches crate version
+        run: |
+          set -euo pipefail
+          tag="${GITHUB_REF_NAME#v}"
+          ver="$(cargo metadata --no-deps --format-version 1 \
+            | jq -r '.packages[] | select(.name == "loami") | .version')"
+          echo "tag=$tag  crate=$ver"
+          if [ "$tag" != "$ver" ]; then
+            echo "::error::tag v$tag does not match crates/loami Cargo.toml version $ver — bump the crate version to match the tag"
+            exit 1
+          fi
+
   github-release:
-    needs: verify
+    needs: [verify, tag-version-match]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:

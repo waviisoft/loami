@@ -10,8 +10,9 @@ which verifies, cuts a GitHub Release, and refreshes the docs site.
 
 ## Steps
 
-1. **Update `CHANGELOG.md`** — move items out of `Unreleased` into a new `## [X.Y.Z]` section.
-2. _(Hygiene)_ bump the version in `crates/loami/Cargo.toml` so the crate version tracks the tag.
+1. **Bump the version** in `crates/loami/Cargo.toml` to `X.Y.Z`. This is **required** — the release
+   fails if the tag does not match the crate version (see below).
+2. **Update `CHANGELOG.md`** — move items out of `Unreleased` into a new `## [X.Y.Z]` section.
 3. Commit on `main` (via PR): `chore(release): vX.Y.Z`.
 4. **Tag and push:**
    ```sh
@@ -22,18 +23,39 @@ which verifies, cuts a GitHub Release, and refreshes the docs site.
 ## What the workflow does
 
 1. **verify** — `fmt`, `clippy -D warnings`, and the full test suite.
-2. **github-release** — creates a GitHub Release with auto-generated notes.
-3. **refresh-docs** — triggers the `docs` workflow so GitHub Pages reflects the release.
+2. **tag-version-match** — fails the release unless the `vX.Y.Z` tag equals the
+   `crates/loami/Cargo.toml` version, so the Cargo version always tracks releases.
+3. **github-release** — creates a GitHub Release with auto-generated notes.
+4. **refresh-docs** — triggers the `docs` workflow so GitHub Pages reflects the release.
 
 ## Rehearsal
 
 Run the `release` workflow manually (`workflow_dispatch`) to execute just the verify gate without
 creating a release.
 
-## Versioning
+## Choosing the version
 
-[Semantic Versioning](https://semver.org/). While on `0.x`, breaking changes may land in minor
-releases — expected during pre-alpha.
+Versions are [Semantic Versioning](https://semver.org/) `MAJOR.MINOR.PATCH`. The "size" of a release
+is just which field you bump — and bumping a field resets the lower fields to `0`. The
+[steps](#steps) above are identical for all three; only the number you pick differs.
+
+| Release | Bump | Example | When |
+| --- | --- | --- | --- |
+| **Patch** `x.y.Z` | last field | `0.3.2 → 0.3.3` | backwards-compatible **bug fixes** only |
+| **Minor** `x.Y.0` | middle, reset patch | `0.3.3 → 0.4.0` | backwards-compatible **new features** |
+| **Major** `X.0.0` | first, reset both | `0.4.0 → 1.0.0` | **breaking** (incompatible API) changes |
+
+### Pre-1.0 nuance (we are here)
+
+While `MAJOR` is `0`, SemVer treats the API as unstable and the convention shifts left by one (this
+is also how Cargo resolves `0.x` dependencies):
+
+- **`0.Y.0`** (bump minor) is the effective **"breaking change"** release while pre-1.0.
+- **`0.y.Z`** (bump patch) covers **both features and fixes**.
+- Bump to **`1.0.0`** only when committing to API stability.
+
+So during pre-alpha most releases are `0.0.Z` and `0.Y.0`; true major (`X.0.0`) bumps don't start
+mattering until after `1.0`.
 
 ## Deferred
 

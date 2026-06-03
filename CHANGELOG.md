@@ -13,8 +13,10 @@ adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Continuous integration: `rustfmt`, `clippy -D warnings`, and tests on Linux and macOS.
 - Documentation site on GitHub Pages: an mdBook guide plus the rustdoc API reference, redeployed on
   every push to `main`.
-- Tag-driven release pipeline: verify → GitHub Release → docs refresh, with a `workflow_dispatch`
-  rehearsal. (Publishing to crates.io/npm/PyPI is deferred until there is something concrete to ship.)
+- Tag-driven release pipeline: verify → tag/version match guard → GitHub Release → docs refresh,
+  with a `workflow_dispatch` rehearsal. The guard fails a release unless the `vX.Y.Z` tag matches the
+  `crates/loami` Cargo version. (Publishing to crates.io/npm/PyPI is deferred until there is something
+  concrete to ship.)
 - Dependabot for Cargo and GitHub Actions.
 
 [Unreleased]: https://github.com/waviisoft/loami/commits/main
