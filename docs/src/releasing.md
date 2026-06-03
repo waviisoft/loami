@@ -66,3 +66,23 @@ When there is something concrete to publish, add a publish job to the release wo
 | crates.io | `cargo publish -p loami` | `CARGO_REGISTRY_TOKEN` |
 | npm (binding) | `npm publish` from `crates/loami-node` | `NPM_TOKEN` |
 | PyPI (binding) | `maturin publish` from `crates/loami-py` | PyPI token |
+
+## Documentation versioning (future)
+
+**Today (pre-alpha):** the docs site is a single "latest" build, redeployed from `main` on every
+push (see [`docs.yml`](https://github.com/waviisoft/loami/blob/main/.github/workflows/docs.yml)).
+While the API churns daily and there are no releases, per-version snapshots would only add noise.
+
+**Planned, at the first published release:**
+
+- **API reference** → let [docs.rs](https://docs.rs) host it, versioned automatically per crate
+  version (`docs.rs/loami/<version>`, `/latest`). This happens for free once we publish to crates.io.
+- **Guide (this site)** → move to a versioned layout with a version selector:
+  - `latest/` — built from `main` on every push (may describe unreleased behavior),
+  - `stable/` — alias of the newest release,
+  - `vX.Y.Z/` — immutable snapshot deployed on each tag.
+
+  Note: the artifact-based `actions/deploy-pages` flow replaces the whole site each run, so
+  accumulating versions means switching the guide to the `gh-pages` branch model (e.g.
+  `peaceiris/actions-gh-pages` with `destination_dir: vX.Y.Z`). The release workflow's
+  `refresh-docs` step is the hook that will publish the per-tag snapshot.
