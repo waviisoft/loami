@@ -29,8 +29,8 @@ cargo doc --no-deps --open    # the API reference
 
 1. Branch from `main` (e.g. `feat/...`, `fix/...`, `docs/...`, `chore/...`).
 2. Make the change **with tests**.
-3. Update `CHANGELOG.md` under `## [Unreleased]`.
-4. Open a PR — CI runs fmt, clippy, tests (Linux + macOS), and a docs build check.
+3. Open a PR — CI runs fmt, clippy, tests (Linux + macOS), and a docs build check. Release notes are
+   generated from PR titles/commits, so write a clear, descriptive PR title.
 
 ## Releases
 

@@ -2,31 +2,21 @@
 
 Releases are **tag-driven**. Pushing a `vX.Y.Z` tag runs the
 [`release`](https://github.com/waviisoft/loami/blob/main/.github/workflows/release.yml) workflow,
-which verifies, cuts a GitHub Release, and refreshes the docs site.
-
-> **Package publishing is deferred.** Loami does not yet publish to crates.io, npm, or PyPI — there
-> is nothing concrete to ship while it is pre-alpha. Those steps will be added to the release
-> workflow once the engine exists. See [Deferred](#deferred) below.
+which verifies, checks the tag matches the crate version, and cuts a GitHub Release — with notes
+auto-generated from the merged PRs and commits since the previous tag. The docs site is already
+current: the version-bump commit that precedes the tag is merged to `main`, and that push redeploys
+GitHub Pages on its own.
 
 ## Steps
 
-1. **Bump the version** in `crates/loami/Cargo.toml` to `X.Y.Z`. This is **required** — the release
-   fails if the tag does not match the crate version (see below).
-2. **Update `CHANGELOG.md`** — move items out of `Unreleased` into a new `## [X.Y.Z]` section.
-3. Commit on `main` (via PR): `chore(release): vX.Y.Z`.
-4. **Tag and push:**
+1. **Bump the version** in `crates/loami/Cargo.toml` to `X.Y.Z`. Required — the release fails unless
+   the tag matches the crate version.
+2. Commit on `main` (via PR): `chore(release): vX.Y.Z`.
+3. **Tag and push:**
    ```sh
    git tag vX.Y.Z
    git push origin vX.Y.Z
    ```
-
-## What the workflow does
-
-1. **verify** — `fmt`, `clippy -D warnings`, and the full test suite.
-2. **tag-version-match** — fails the release unless the `vX.Y.Z` tag equals the
-   `crates/loami/Cargo.toml` version, so the Cargo version always tracks releases.
-3. **github-release** — creates a GitHub Release with auto-generated notes.
-4. **refresh-docs** — triggers the `docs` workflow so GitHub Pages reflects the release.
 
 ## Rehearsal
 
@@ -54,35 +44,5 @@ is also how Cargo resolves `0.x` dependencies):
 - **`0.y.Z`** (bump patch) covers **both features and fixes**.
 - Bump to **`1.0.0`** only when committing to API stability.
 
-So during pre-alpha most releases are `0.0.Z` and `0.Y.0`; true major (`X.0.0`) bumps don't start
+So while pre-`1.0` most releases are `0.0.Z` and `0.Y.0`; true major (`X.0.0`) bumps don't start
 mattering until after `1.0`.
-
-## Deferred
-
-When there is something concrete to publish, add a publish job to the release workflow:
-
-| Target | How | Secret |
-| --- | --- | --- |
-| crates.io | `cargo publish -p loami` | `CARGO_REGISTRY_TOKEN` |
-| npm (binding) | `npm publish` from `crates/loami-node` | `NPM_TOKEN` |
-| PyPI (binding) | `maturin publish` from `crates/loami-py` | PyPI token |
-
-## Documentation versioning (future)
-
-**Today (pre-alpha):** the docs site is a single "latest" build, redeployed from `main` on every
-push (see [`docs.yml`](https://github.com/waviisoft/loami/blob/main/.github/workflows/docs.yml)).
-While the API churns daily and there are no releases, per-version snapshots would only add noise.
-
-**Planned, at the first published release:**
-
-- **API reference** → let [docs.rs](https://docs.rs) host it, versioned automatically per crate
-  version (`docs.rs/loami/<version>`, `/latest`). This happens for free once we publish to crates.io.
-- **Guide (this site)** → move to a versioned layout with a version selector:
-  - `latest/` — built from `main` on every push (may describe unreleased behavior),
-  - `stable/` — alias of the newest release,
-  - `vX.Y.Z/` — immutable snapshot deployed on each tag.
-
-  Note: the artifact-based `actions/deploy-pages` flow replaces the whole site each run, so
-  accumulating versions means switching the guide to the `gh-pages` branch model (e.g.
-  `peaceiris/actions-gh-pages` with `destination_dir: vX.Y.Z`). The release workflow's
-  `refresh-docs` step is the hook that will publish the per-tag snapshot.

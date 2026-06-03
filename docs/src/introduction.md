@@ -5,8 +5,8 @@ apps that provides a **document store, durable queue, realtime websocket backpla
 background-job runner** over one self-clustering, churn-tolerant kernel whose only dependencies are
 **compute + blob storage** (S3 / GCS / Azure Blob / Cloudflare R2).
 
-> ⚠️ **Status: pre-alpha / design phase.** There is no usable engine yet. This site documents the
-> vision and tracks progress; everything here will change.
+> ⚠️ **Status: pre-alpha.** Loami is in early development. This site documents the project as it
+> takes shape.
 
 ## Why
 
@@ -27,4 +27,4 @@ compute and a bucket.
 6. **Churn-tolerant by default** — assume spot instances vanish.
 
 See the [Roadmap](./roadmap.md) for sequencing, and the
-[API reference](https://waviisoft.github.io/loami/api/) for the (currently placeholder) crate docs.
+[API reference](https://waviisoft.github.io/loami/api/) for the crate docs.
