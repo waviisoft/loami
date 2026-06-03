@@ -1,0 +1,14 @@
+[book]
+title = "Loami"
+description = "Fertile ground for your backend — an embeddable backend substrate built on compute + blob storage."
+authors = ["WAVIISoft, LLC"]
+language = "en"
+src = "src"
+
+[output.html]
+default-theme = "rust"
+git-repository-url = "https://github.com/waviisoft/loami"
+edit-url-template = "https://github.com/waviisoft/loami/edit/main/docs/src/{path}"
+
+[output.html.fold]
+enable = true
