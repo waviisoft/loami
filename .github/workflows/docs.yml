@@ -1,0 +1,68 @@
+name: docs
+
+# Builds the documentation site (mdBook guide + rustdoc API reference) and deploys it to
+# GitHub Pages. Runs on every push to main, and can be triggered manually (e.g. by the release
+# workflow) via workflow_dispatch.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; don't cancel an in-progress deploy.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    env:
+      RUSTDOCFLAGS: -D warnings
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+      - uses: peaceiris/actions-mdbook@v2
+        with:
+          mdbook-version: latest
+
+      - name: Build guide (mdBook)
+        run: mdbook build docs
+
+      - name: Build API reference (rustdoc)
+        run: cargo doc --no-deps --all-features
+
+      - name: Assemble site
+        run: |
+          set -euo pipefail
+          rm -rf _site
+          mkdir -p _site/api
+          cp -r docs/book/* _site/
+          cp -r target/doc/* _site/api/
+          # Land /api on the crate's docs.
+          printf '<!doctype html><meta http-equiv="refresh" content="0; url=loami/index.html">\n' > _site/api/index.html
+          # Disable Jekyll so paths beginning with `_` (rustdoc internals) are served.
+          touch _site/.nojekyll
+
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

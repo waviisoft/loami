@@ -4,6 +4,10 @@
 
 > _SQLite's simplicity, for your entire backend._
 
+[![CI](https://github.com/waviisoft/loami/actions/workflows/ci.yml/badge.svg)](https://github.com/waviisoft/loami/actions/workflows/ci.yml)
+[![Docs](https://github.com/waviisoft/loami/actions/workflows/docs.yml/badge.svg)](https://waviisoft.github.io/loami/)
+[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+
 > ⚠️ **Status: pre-alpha / design phase.** Loami is an early design exploration — there is no
 > usable code yet. This README captures the vision and scope so the shape is clear before the
 > first line of the engine is written. Expect everything here to change.
@@ -81,6 +85,27 @@ coherent backend with no external coordinator.
    then a clustered tier.
 2. **Websocket + message routing** — realtime fan-out across instances without a separate backplane.
 3. **Pub/sub for job handling** — async workers (e.g. AI calls), at-least-once with idempotency.
+
+## Documentation
+
+The docs site (an mdBook guide + the rustdoc API reference) is published to GitHub Pages and
+rebuilt on every push to `main`:
+
+- **Guide:** <https://waviisoft.github.io/loami/>
+- **API reference:** <https://waviisoft.github.io/loami/api/>
+
+## Development
+
+```sh
+cargo fmt --all                                            # format
+cargo clippy --all-targets --all-features -- -D warnings   # lint
+cargo test --all --all-features                            # test
+mdbook serve docs --open                                   # preview the guide (needs mdBook)
+```
+
+CI runs fmt, clippy, and the test suite (Linux + macOS) on every push and PR. Releases are
+tag-driven — see [docs/src/releasing.md](./docs/src/releasing.md). Contributions follow
+[CONTRIBUTING.md](./CONTRIBUTING.md) — **every change ships with tests.**
 
 ## License
 

@@ -1,0 +1,18 @@
+[package]
+name = "loami"
+version = "0.0.1"
+description = "Fertile ground for your backend — an embeddable backend substrate built on compute + blob storage. Pre-alpha."
+readme = "../../README.md"
+keywords = ["database", "embedded", "document-store", "blob", "backend"]
+categories = ["database", "database-implementations"]
+rust-version = "1.80"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]

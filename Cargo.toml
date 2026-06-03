@@ -1,0 +1,18 @@
+[workspace]
+resolver = "2"
+members = ["crates/loami"]
+
+[workspace.package]
+edition = "2021"
+license = "MIT"
+repository = "https://github.com/waviisoft/loami"
+homepage = "https://waviisoft.github.io/loami"
+authors = ["WAVIISoft, LLC"]
+
+[workspace.lints.clippy]
+# Keep the bar high from day one; loosen deliberately, never by accident.
+all = "warn"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+missing_docs = "warn"
