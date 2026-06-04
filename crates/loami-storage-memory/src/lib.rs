@@ -137,8 +137,10 @@ impl StorageProvider for MemoryProvider {
     }
 
     fn list(&self, prefix: &str) -> BoxStream<'_, Result<ObjectMeta>> {
-        // Snapshot the matching entries under the lock, then stream the snapshot (sorted for a
-        // deterministic order). The lock is not held while the stream is consumed.
+        // Snapshot the matching entries under the lock, then stream the snapshot; the lock is not
+        // held while the stream is consumed. Sorting is incidental — it keeps this in-memory
+        // backend's output stable for tests — but the contract leaves list order unspecified, so
+        // callers must not rely on it.
         let mut metas: Vec<ObjectMeta> = {
             let objects = self.objects.lock().expect("lock poisoned");
             objects

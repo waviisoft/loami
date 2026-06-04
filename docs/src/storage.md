@@ -15,7 +15,7 @@ A provider exposes a small object-store surface:
 | `head` | size + ETag + last-modified, without the body |
 | `put` | write, with a conditional mode (below) |
 | `delete` | remove an object (idempotent) |
-| `list` / `list_all` | **stream** objects under a key prefix (lazy, constant-memory), or collect them into a `Vec` |
+| `list` / `list_all` | **stream** objects under a key prefix (lazy), or collect them into a `Vec` |
 
 ### Keys
 
@@ -23,7 +23,7 @@ A key is a non-empty, `/`-separated path whose segments contain only `[A-Za-z0-9
 trailing, or empty segments, and no `.`/`..`. Providers reject anything else with an `InvalidKey`
 error, so keys round-trip byte-for-byte across every backend and path-traversal segments are barred.
 `list(prefix)` matches on segment boundaries (directory-style): `list("a/b")` returns `a/b/c` but not
-`a/bc`.
+`a/bc`. List order is unspecified and may differ between backends — sort if you need a stable order.
 
 ### Conditional writes (compare-and-swap)
 

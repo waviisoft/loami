@@ -64,9 +64,10 @@ pub trait StorageProvider: Send + Sync {
     /// `a/bc`. Whether an object whose key is exactly `prefix` is included is unspecified; the
     /// engine never lists a prefix that is also an object key.
     ///
-    /// The stream is lazy and constant-memory: a caller may stop early (e.g. via `take`) without
-    /// enumerating the whole prefix. Use [`list_all`](Self::list_all) when the result set is bounded
-    /// and a `Vec` is more convenient.
+    /// The stream is lazy — a caller may stop early (e.g. via `take`) without enumerating the whole
+    /// prefix — and constant-memory for backends that stream natively. The **order of results is
+    /// unspecified** and may differ between providers; sort if you need a stable order. Use
+    /// [`list_all`](Self::list_all) when the result set is bounded and a `Vec` is more convenient.
     fn list(&self, prefix: &str) -> BoxStream<'_, Result<ObjectMeta>>;
 
     /// Collects [`list`](Self::list) into a `Vec`. Convenience for callers that want every entry and
