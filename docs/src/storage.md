@@ -50,7 +50,25 @@ cluster.
   (account key, SAS, service principal, managed identity), or pass a configured
   `MicrosoftAzureBuilder`. Local/CI testing runs against the Azurite emulator.
 
-More providers are tracked on the [roadmap](./roadmap.md).
+## Constructing a provider
+
+Each provider is constructed differently; everything *after* construction is identical — that
+interchangeability is the whole point of the contract.
+
+```rust
+use loami_storage_memory::MemoryProvider;
+use loami_storage_fs::FsProvider;
+use loami_storage_azure::AzureProvider;
+
+// In-memory — tests, CI, ephemeral use.
+let mem = MemoryProvider::new();
+
+// Local filesystem — rooted at an existing directory.
+let fs = FsProvider::new("./data")?;
+
+// Azure Blob — credentials from the standard AZURE_STORAGE_* environment.
+let azure = AzureProvider::from_env("my-container")?;
+```
 
 ## Using a provider
 
