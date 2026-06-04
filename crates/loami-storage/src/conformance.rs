@@ -27,9 +27,12 @@ pub async fn run_conformance_suite(provider: &dyn StorageProvider) {
     head_reports_size_and_etag(provider).await;
     range_reads(provider).await;
     list_by_prefix(provider).await;
+    list_uses_path_segment_prefix(provider).await;
     delete_is_idempotent(provider).await;
     create_mode_cas(provider).await;
     update_mode_cas(provider).await;
+    invalid_keys_are_rejected(provider).await;
+    canonical_keys_round_trip(provider).await;
 }
 
 fn key(name: &str) -> ObjectKey {
@@ -124,6 +127,22 @@ async fn range_reads(provider: &dyn StorageProvider) {
         Err(StorageError::InvalidRange { .. }) => {}
         other => panic!("expected InvalidRange for an out-of-bounds read, got {other:?}"),
     }
+
+    let empty = provider
+        .get_range(&key, 5..5)
+        .await
+        .expect("empty range should succeed");
+    assert!(empty.data.is_empty(), "an empty range must return no bytes");
+
+    let full = provider
+        .get_range(&key, 0..10)
+        .await
+        .expect("full range should succeed");
+    assert_eq!(
+        full.data,
+        Bytes::from_static(b"0123456789"),
+        "a full range must return the whole object"
+    );
 
     provider.delete(&key).await.expect("cleanup delete");
 }
@@ -263,6 +282,99 @@ async fn update_mode_cas(provider: &dyn StorageProvider) {
         provider.get(&key).await.expect("get").data,
         Bytes::from_static(b"v2"),
         "a failed update must not modify the object"
+    );
+
+    provider.delete(&key).await.expect("cleanup delete");
+}
+
+async fn list_uses_path_segment_prefix(provider: &dyn StorageProvider) {
+    let root = "conformance/segment/";
+    for meta in provider.list(root).await.expect("list should succeed") {
+        provider.delete(&meta.key).await.expect("cleanup delete");
+    }
+
+    let under_a = ObjectKey::new("conformance/segment/dir/a");
+    let under_b = ObjectKey::new("conformance/segment/dir/b");
+    // Shares the *string* prefix "conformance/segment/dir" but is a different path segment.
+    let sibling = ObjectKey::new("conformance/segment/director/c");
+    for key in [&under_a, &under_b, &sibling] {
+        provider
+            .put(key, Bytes::from_static(b"x"), PutOptions::overwrite())
+            .await
+            .expect("put should succeed");
+    }
+
+    for prefix in ["conformance/segment/dir", "conformance/segment/dir/"] {
+        let mut listed: Vec<String> = provider
+            .list(prefix)
+            .await
+            .expect("list should succeed")
+            .into_iter()
+            .map(|m| m.key.as_str().to_owned())
+            .collect();
+        listed.sort();
+        assert_eq!(
+            listed,
+            vec![under_a.as_str().to_owned(), under_b.as_str().to_owned()],
+            "list must match on path-segment boundaries, not as a raw string prefix"
+        );
+    }
+
+    for key in [&under_a, &under_b, &sibling] {
+        provider.delete(key).await.expect("cleanup delete");
+    }
+}
+
+async fn invalid_keys_are_rejected(provider: &dyn StorageProvider) {
+    for bad in [
+        "",
+        "/leading",
+        "trailing/",
+        "double//slash",
+        "..",
+        "a/../b",
+        "has space",
+        "café/x",
+    ] {
+        let key = ObjectKey::new(bad);
+        match provider
+            .put(&key, Bytes::from_static(b"x"), PutOptions::overwrite())
+            .await
+        {
+            Err(StorageError::InvalidKey { .. }) => {}
+            other => panic!("put with invalid key {bad:?} must be rejected, got {other:?}"),
+        }
+        match provider.get(&key).await {
+            Err(StorageError::InvalidKey { .. }) => {}
+            other => panic!("get with invalid key {bad:?} must be rejected, got {other:?}"),
+        }
+    }
+}
+
+async fn canonical_keys_round_trip(provider: &dyn StorageProvider) {
+    // A valid key (only [A-Za-z0-9._-] segments) must be returned byte-for-byte by every provider,
+    // with no backend-specific normalization.
+    let key = ObjectKey::new("conformance/round.trip/a_b-c.1");
+    provider.delete(&key).await.expect("delete should not fail");
+    provider
+        .put(&key, Bytes::from_static(b"x"), PutOptions::overwrite())
+        .await
+        .expect("put should succeed");
+
+    let head = provider.head(&key).await.expect("head should succeed");
+    assert_eq!(
+        head.key.as_str(),
+        key.as_str(),
+        "head must return the key unchanged"
+    );
+
+    let listed = provider
+        .list("conformance/round.trip")
+        .await
+        .expect("list should succeed");
+    assert!(
+        listed.iter().any(|m| m.key.as_str() == key.as_str()),
+        "list must return the key unchanged"
     );
 
     provider.delete(&key).await.expect("cleanup delete");

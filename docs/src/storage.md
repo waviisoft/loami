@@ -17,6 +17,14 @@ A provider exposes a small object-store surface:
 | `delete` | remove an object (idempotent) |
 | `list` | enumerate objects under a key prefix |
 
+### Keys
+
+A key is a non-empty, `/`-separated path whose segments contain only `[A-Za-z0-9._-]` — no leading,
+trailing, or empty segments, and no `.`/`..`. Providers reject anything else with an `InvalidKey`
+error, so keys round-trip byte-for-byte across every backend and path-traversal segments are barred.
+`list(prefix)` matches on segment boundaries (directory-style): `list("a/b")` returns `a/b/c` but not
+`a/bc`.
+
 ### Conditional writes (compare-and-swap)
 
 `put` takes a `PutMode` that provides optimistic-concurrency control:

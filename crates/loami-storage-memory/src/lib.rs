@@ -58,6 +58,7 @@ impl MemoryProvider {
 #[async_trait::async_trait]
 impl StorageProvider for MemoryProvider {
     async fn get(&self, key: &ObjectKey) -> Result<GetResult> {
+        key.validate()?;
         let objects = self.objects.lock().expect("lock poisoned");
         let entry = objects
             .get(key)
@@ -69,6 +70,7 @@ impl StorageProvider for MemoryProvider {
     }
 
     async fn get_range(&self, key: &ObjectKey, range: std::ops::Range<u64>) -> Result<GetResult> {
+        key.validate()?;
         let objects = self.objects.lock().expect("lock poisoned");
         let entry = objects
             .get(key)
@@ -89,6 +91,7 @@ impl StorageProvider for MemoryProvider {
     }
 
     async fn head(&self, key: &ObjectKey) -> Result<ObjectMeta> {
+        key.validate()?;
         let objects = self.objects.lock().expect("lock poisoned");
         let entry = objects
             .get(key)
@@ -97,6 +100,7 @@ impl StorageProvider for MemoryProvider {
     }
 
     async fn put(&self, key: &ObjectKey, data: Bytes, options: PutOptions) -> Result<PutResult> {
+        key.validate()?;
         let mut objects = self.objects.lock().expect("lock poisoned");
         match options.mode {
             PutMode::Overwrite => {}
@@ -124,6 +128,7 @@ impl StorageProvider for MemoryProvider {
     }
 
     async fn delete(&self, key: &ObjectKey) -> Result<()> {
+        key.validate()?;
         let mut objects = self.objects.lock().expect("lock poisoned");
         objects.remove(key);
         Ok(())
@@ -133,10 +138,20 @@ impl StorageProvider for MemoryProvider {
         let objects = self.objects.lock().expect("lock poisoned");
         Ok(objects
             .iter()
-            .filter(|(key, _)| key.as_str().starts_with(prefix))
+            .filter(|(key, _)| key_has_prefix(key.as_str(), prefix))
             .map(|(key, entry)| object_meta(key, entry))
             .collect())
     }
+}
+
+/// Path-segment prefix match (directory-style): an empty prefix matches everything, a trailing `/`
+/// is ignored, and a non-empty prefix matches only keys strictly beneath it on a `/` boundary.
+fn key_has_prefix(key: &str, prefix: &str) -> bool {
+    if prefix.is_empty() {
+        return true;
+    }
+    let prefix = prefix.strip_suffix('/').unwrap_or(prefix);
+    key.len() > prefix.len() && key.starts_with(prefix) && key.as_bytes()[prefix.len()] == b'/'
 }
 
 #[cfg(test)]
