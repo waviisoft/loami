@@ -1,12 +1,17 @@
-# Loami
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="brand/svg/loami-lockup-dark.svg">
+    <img src="brand/svg/loami-lockup.svg" alt="Loami" width="415">
+  </picture>
+</p>
 
-**Fertile ground for your backend.**
+<p align="center"><em>Fertile ground for your backend.</em> — SQLite's simplicity, for your entire backend.</p>
 
-> _SQLite's simplicity, for your entire backend._
-
-[![CI](https://github.com/waviisoft/loami/actions/workflows/ci.yml/badge.svg)](https://github.com/waviisoft/loami/actions/workflows/ci.yml)
-[![Docs](https://github.com/waviisoft/loami/actions/workflows/docs.yml/badge.svg)](https://waviisoft.github.io/loami/)
-[![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
+<p align="center">
+  <a href="https://github.com/waviisoft/loami/actions/workflows/ci.yml"><img src="https://github.com/waviisoft/loami/actions/workflows/ci.yml/badge.svg" alt="CI"></a>
+  <a href="https://waviisoft.github.io/loami/"><img src="https://github.com/waviisoft/loami/actions/workflows/docs.yml/badge.svg" alt="Docs"></a>
+  <a href="./LICENSE"><img src="https://img.shields.io/badge/license-MIT-blue.svg" alt="License: MIT"></a>
+</p>
 
 > ⚠️ **Status: pre-alpha / design phase.** Loami is an early design exploration — there is no
 > usable code yet. This README captures the vision and scope so the shape is clear before the
