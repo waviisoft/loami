@@ -74,3 +74,26 @@ jobs:
         run: mdbook build docs
       - name: Build API reference (rustdoc)
         run: cargo doc --no-deps --all-features
+
+  azure:
+    name: azure (azurite)
+    runs-on: ubuntu-latest
+    services:
+      azurite:
+        image: mcr.microsoft.com/azure-storage/azurite
+        ports:
+          - 10000:10000
+    steps:
+      - uses: actions/checkout@v6
+      - uses: dtolnay/rust-toolchain@v1
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: Create the conformance container in Azurite
+        # The account key below is Azurite's public, well-known development key — not a secret.
+        run: |
+          az storage container create \
+            --name loami-conformance \
+            --connection-string "DefaultEndpointsProtocol=http;AccountName=devstoreaccount1;AccountKey=Eby8vdM02xNOcqFlqUwJPLlmEtlCDXJ1OUzFT50uSRZ6IFsuFq2UVErCz4I6tq/K1SZFPTOtr/KBHBeksoGMGw==;BlobEndpoint=http://127.0.0.1:10000/devstoreaccount1;"
+      - name: Run the conformance suite against Azurite
+        run: cargo test -p loami-storage-azure --all-features -- --ignored

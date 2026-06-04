@@ -44,8 +44,13 @@ cluster.
 - **Filesystem** (`loami-storage-fs`) — a local-filesystem store rooted at a directory, built on
   `object_store`. For local development and single-node persistence. It emulates the conditional
   `Update` (compare-and-swap) that the local backend lacks, under a single-writer assumption.
+- **Azure Blob** (`loami-storage-azure`) — Azure Blob Storage (`azure://`), built on `object_store`,
+  with native conditional writes (CAS) and lazy listing. Credentials use the standard Azure
+  conventions — `AzureProvider::from_env(container)` reads the usual `AZURE_STORAGE_*` variables
+  (account key, SAS, service principal, managed identity), or pass a configured
+  `MicrosoftAzureBuilder`. Local/CI testing runs against the Azurite emulator.
 
-More providers (Azure Blob, …) are tracked on the [roadmap](./roadmap.md).
+More providers are tracked on the [roadmap](./roadmap.md).
 
 ## Using a provider
 
