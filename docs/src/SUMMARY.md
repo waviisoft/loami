@@ -3,6 +3,9 @@
 [Introduction](./introduction.md)
 
 - [Storage providers](./storage.md)
+  - [Memory](./storage/memory.md)
+  - [Filesystem](./storage/fs.md)
+  - [Azure Blob](./storage/azure.md)
 - [Roadmap](./roadmap.md)
 - [Releasing](./releasing.md)
 

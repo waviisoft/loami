@@ -39,13 +39,14 @@ cluster.
 
 ## Built-in providers
 
-- **Memory** (`loami-storage-memory`) — an in-process store for tests, CI, and ephemeral use. It is
-  also the contract's reference implementation.
-- **Filesystem** (`loami-storage-fs`) — a local-filesystem store rooted at a directory, built on
-  `object_store`. For local development and single-node persistence. It emulates the conditional
-  `Update` (compare-and-swap) that the local backend lacks, under a single-writer assumption.
+Each provider has its own page covering its storage mechanism, callouts, and configuration. They are
+constructed differently but used identically — that interchangeability is the point of the contract.
 
-More providers (Azure Blob, …) are tracked on the [roadmap](./roadmap.md).
+- **[Memory](./storage/memory.md)** (`loami-storage-memory`) — in-process; tests, CI, ephemeral use.
+- **[Filesystem](./storage/fs.md)** (`loami-storage-fs`) — local files (`file://`); development and
+  single-node persistence.
+- **[Azure Blob](./storage/azure.md)** (`loami-storage-azure`) — Azure Blob (`azure://`); native
+  compare-and-swap and lazy listing.
 
 ## Using a provider
 
