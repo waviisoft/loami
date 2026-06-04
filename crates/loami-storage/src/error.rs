@@ -50,6 +50,15 @@ pub enum StorageError {
         operation: &'static str,
     },
 
+    /// The key is not well-formed (see [`ObjectKey::validate`](crate::ObjectKey::validate)).
+    #[error("invalid object key {key:?}: {reason}")]
+    InvalidKey {
+        /// The offending key.
+        key: String,
+        /// Why the key was rejected.
+        reason: &'static str,
+    },
+
     /// An error originating from the underlying backend.
     #[error("storage backend error: {source}")]
     Backend {

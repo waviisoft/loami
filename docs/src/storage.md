@@ -17,6 +17,14 @@ A provider exposes a small object-store surface:
 | `delete` | remove an object (idempotent) |
 | `list` | enumerate objects under a key prefix |
 
+### Keys
+
+A key is a non-empty, `/`-separated path whose segments contain only `[A-Za-z0-9._-]` — no leading,
+trailing, or empty segments, and no `.`/`..`. Providers reject anything else with an `InvalidKey`
+error, so keys round-trip byte-for-byte across every backend and path-traversal segments are barred.
+`list(prefix)` matches on segment boundaries (directory-style): `list("a/b")` returns `a/b/c` but not
+`a/bc`.
+
 ### Conditional writes (compare-and-swap)
 
 `put` takes a `PutMode` that provides optimistic-concurrency control:
@@ -33,8 +41,11 @@ cluster.
 
 - **Memory** (`loami-storage-memory`) — an in-process store for tests, CI, and ephemeral use. It is
   also the contract's reference implementation.
+- **Filesystem** (`loami-storage-fs`) — a local-filesystem store rooted at a directory, built on
+  `object_store`. For local development and single-node persistence. It emulates the conditional
+  `Update` (compare-and-swap) that the local backend lacks, under a single-writer assumption.
 
-More providers (local filesystem, Azure Blob, …) are tracked on the [roadmap](./roadmap.md).
+More providers (Azure Blob, …) are tracked on the [roadmap](./roadmap.md).
 
 ## Using a provider
 

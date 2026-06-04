@@ -5,6 +5,8 @@ use std::time::SystemTime;
 
 use bytes::Bytes;
 
+use crate::{Result, StorageError};
+
 /// The key (path) identifying an object within a provider's namespace.
 ///
 /// Keys are UTF-8 strings using forward slashes (`/`) as separators, e.g. `wal/000042`. They are
@@ -22,6 +24,49 @@ impl ObjectKey {
     #[must_use]
     pub fn as_str(&self) -> &str {
         &self.0
+    }
+
+    /// Validates that the key is well-formed and identical across every provider (no
+    /// backend-specific normalization). A valid key is a non-empty sequence of `/`-separated
+    /// segments where each segment is non-empty, is neither `.` nor `..`, and contains only the
+    /// characters `[A-Za-z0-9._-]`. There is no leading, trailing, or repeated `/`.
+    ///
+    /// Providers reject invalid keys with [`StorageError::InvalidKey`] before touching the backend.
+    /// This guarantees keys round-trip unchanged and bars path-traversal segments.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`StorageError::InvalidKey`] describing the first violation found.
+    pub fn validate(&self) -> Result<()> {
+        let key = &self.0;
+        if key.is_empty() {
+            return Err(self.invalid("key must not be empty"));
+        }
+        if key.starts_with('/') || key.ends_with('/') {
+            return Err(self.invalid("key must not start or end with '/'"));
+        }
+        for segment in key.split('/') {
+            if segment.is_empty() {
+                return Err(self.invalid("key must not contain an empty segment ('//')"));
+            }
+            if segment == "." || segment == ".." {
+                return Err(self.invalid("key segments must not be '.' or '..'"));
+            }
+            if !segment
+                .bytes()
+                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+            {
+                return Err(self.invalid("key segments may contain only [A-Za-z0-9._-]"));
+            }
+        }
+        Ok(())
+    }
+
+    fn invalid(&self, reason: &'static str) -> StorageError {
+        StorageError::InvalidKey {
+            key: self.0.clone(),
+            reason,
+        }
     }
 }
 

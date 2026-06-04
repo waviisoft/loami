@@ -12,8 +12,10 @@ use crate::{GetResult, ObjectKey, ObjectMeta, PutOptions, PutResult, Result};
 /// cheaply cloneable behind an `Arc` and safe to share across tasks (`Send + Sync`). Every
 /// implementation must pass the [`conformance`](crate::conformance) suite.
 ///
-/// Keys are forward-slash-separated paths (see [`ObjectKey`]). All methods are asynchronous; the
-/// engine drives them on its own runtime.
+/// Keys are forward-slash-separated paths (see [`ObjectKey`]). Every key-addressed method validates
+/// its key with [`ObjectKey::validate`](crate::ObjectKey::validate) and returns
+/// [`StorageError::InvalidKey`](crate::StorageError::InvalidKey) before touching the backend. All
+/// methods are asynchronous; the engine drives them on its own runtime.
 #[async_trait::async_trait]
 pub trait StorageProvider: Send + Sync {
     /// Reads the full contents of the object at `key`, together with its metadata.
@@ -28,8 +30,11 @@ pub trait StorageProvider: Send + Sync {
     /// Reads the half-open byte range `range` (`start..end`) of the object at `key`, together with
     /// the object's metadata.
     ///
-    /// [`GetResult::data`] is the requested slice; [`GetResult::meta`] describes the whole object
-    /// (including its current ETag).
+    /// [`GetResult::data`] is the requested slice; an empty range (`start == end`, within bounds)
+    /// returns empty data. [`GetResult::meta`] describes the whole object (including its current
+    /// ETag). Unlike [`get`](Self::get), a provider may read the metadata
+    /// separately from the bytes, so under concurrent modification the two could reflect different
+    /// versions; this does not arise under Loami's single-writer model.
     ///
     /// Returns [`StorageError::NotFound`](crate::StorageError::NotFound) if no object exists, or
     /// [`StorageError::InvalidRange`](crate::StorageError::InvalidRange) if the range is malformed or
@@ -51,6 +56,10 @@ pub trait StorageProvider: Send + Sync {
     /// Deleting a key that does not exist succeeds (the operation is idempotent).
     async fn delete(&self, key: &ObjectKey) -> Result<()>;
 
-    /// Lists metadata for all objects whose key begins with `prefix`.
+    /// Lists metadata for all objects under `prefix`, matched on `/`-segment boundaries
+    /// (directory-style), not as a raw string prefix. A trailing `/` on `prefix` is ignored, and an
+    /// empty `prefix` lists every object. For example, `list("a/b")` returns `a/b/c` but not
+    /// `a/bc`. Whether an object whose key is exactly `prefix` is included is unspecified; the
+    /// engine never lists a prefix that is also an object key.
     async fn list(&self, prefix: &str) -> Result<Vec<ObjectMeta>>;
 }
