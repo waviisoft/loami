@@ -27,4 +27,4 @@ mod types;
 
 pub use error::{Result, StorageError};
 pub use provider::StorageProvider;
-pub use types::{Etag, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult};
+pub use types::{Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult};

@@ -3,6 +3,8 @@
 use std::fmt;
 use std::time::SystemTime;
 
+use bytes::Bytes;
+
 /// The key (path) identifying an object within a provider's namespace.
 ///
 /// Keys are UTF-8 strings using forward slashes (`/`) as separators, e.g. `wal/000042`. They are
@@ -140,4 +142,21 @@ impl PutOptions {
 pub struct PutResult {
     /// The ETag of the newly written object, for use in a subsequent conditional update.
     pub etag: Etag,
+}
+
+/// The result of a read: the bytes together with the object's metadata.
+///
+/// Returning metadata alongside the body lets a caller capture the ETag of *exactly* the bytes it
+/// read, in a single operation. This avoids a separate [`head`](crate::StorageProvider::head) call
+/// and the read-then-head race that would otherwise let the ETag drift between the two calls before a
+/// follow-up conditional write ([`PutMode::Update`]).
+#[derive(Clone, Debug)]
+pub struct GetResult {
+    /// The bytes read — the whole object for [`get`](crate::StorageProvider::get), or the requested
+    /// slice for [`get_range`](crate::StorageProvider::get_range).
+    pub data: Bytes,
+    /// Metadata for the object as a whole: notably its current [`etag`](ObjectMeta::etag) (valid for
+    /// a subsequent [`PutMode::Update`]) and its full [`size`](ObjectMeta::size). For a range read,
+    /// `size` is the size of the whole object, not the length of `data`.
+    pub meta: ObjectMeta,
 }

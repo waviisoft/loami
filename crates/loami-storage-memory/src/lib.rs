@@ -14,7 +14,7 @@ use std::time::SystemTime;
 
 use bytes::Bytes;
 use loami_storage::{
-    Etag, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult, Result, StorageError,
+    Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult, Result, StorageError,
     StorageProvider,
 };
 
@@ -34,6 +34,15 @@ struct Entry {
     last_modified: SystemTime,
 }
 
+fn object_meta(key: &ObjectKey, entry: &Entry) -> ObjectMeta {
+    ObjectMeta {
+        key: key.clone(),
+        size: entry.data.len() as u64,
+        etag: entry.etag.clone(),
+        last_modified: Some(entry.last_modified),
+    }
+}
+
 impl MemoryProvider {
     /// Creates an empty in-memory store.
     #[must_use]
@@ -48,15 +57,18 @@ impl MemoryProvider {
 
 #[async_trait::async_trait]
 impl StorageProvider for MemoryProvider {
-    async fn get(&self, key: &ObjectKey) -> Result<Bytes> {
+    async fn get(&self, key: &ObjectKey) -> Result<GetResult> {
         let objects = self.objects.lock().expect("lock poisoned");
-        objects
+        let entry = objects
             .get(key)
-            .map(|entry| entry.data.clone())
-            .ok_or_else(|| StorageError::NotFound { key: key.clone() })
+            .ok_or_else(|| StorageError::NotFound { key: key.clone() })?;
+        Ok(GetResult {
+            data: entry.data.clone(),
+            meta: object_meta(key, entry),
+        })
     }
 
-    async fn get_range(&self, key: &ObjectKey, range: std::ops::Range<u64>) -> Result<Bytes> {
+    async fn get_range(&self, key: &ObjectKey, range: std::ops::Range<u64>) -> Result<GetResult> {
         let objects = self.objects.lock().expect("lock poisoned");
         let entry = objects
             .get(key)
@@ -70,7 +82,10 @@ impl StorageProvider for MemoryProvider {
                 size,
             });
         }
-        Ok(entry.data.slice(range.start as usize..range.end as usize))
+        Ok(GetResult {
+            data: entry.data.slice(range.start as usize..range.end as usize),
+            meta: object_meta(key, entry),
+        })
     }
 
     async fn head(&self, key: &ObjectKey) -> Result<ObjectMeta> {
@@ -78,12 +93,7 @@ impl StorageProvider for MemoryProvider {
         let entry = objects
             .get(key)
             .ok_or_else(|| StorageError::NotFound { key: key.clone() })?;
-        Ok(ObjectMeta {
-            key: key.clone(),
-            size: entry.data.len() as u64,
-            etag: entry.etag.clone(),
-            last_modified: Some(entry.last_modified),
-        })
+        Ok(object_meta(key, entry))
     }
 
     async fn put(&self, key: &ObjectKey, data: Bytes, options: PutOptions) -> Result<PutResult> {
@@ -124,12 +134,7 @@ impl StorageProvider for MemoryProvider {
         Ok(objects
             .iter()
             .filter(|(key, _)| key.as_str().starts_with(prefix))
-            .map(|(key, entry)| ObjectMeta {
-                key: key.clone(),
-                size: entry.data.len() as u64,
-                etag: entry.etag.clone(),
-                last_modified: Some(entry.last_modified),
-            })
+            .map(|(key, entry)| object_meta(key, entry))
             .collect())
     }
 }
@@ -152,6 +157,9 @@ mod tests {
             .put(&key, Bytes::from_static(b"hi"), PutOptions::overwrite())
             .await
             .unwrap();
-        assert_eq!(provider.get(&key).await.unwrap(), Bytes::from_static(b"hi"));
+        assert_eq!(
+            provider.get(&key).await.unwrap().data,
+            Bytes::from_static(b"hi")
+        );
     }
 }

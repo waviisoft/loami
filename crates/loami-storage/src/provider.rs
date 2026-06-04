@@ -4,7 +4,7 @@ use std::ops::Range;
 
 use bytes::Bytes;
 
-use crate::{ObjectKey, ObjectMeta, PutOptions, PutResult, Result};
+use crate::{GetResult, ObjectKey, ObjectMeta, PutOptions, PutResult, Result};
 
 /// An object store that Loami can persist to and read from.
 ///
@@ -16,17 +16,25 @@ use crate::{ObjectKey, ObjectMeta, PutOptions, PutResult, Result};
 /// engine drives them on its own runtime.
 #[async_trait::async_trait]
 pub trait StorageProvider: Send + Sync {
-    /// Reads the full contents of the object at `key`.
+    /// Reads the full contents of the object at `key`, together with its metadata.
+    ///
+    /// The returned [`GetResult::meta`] carries the ETag of exactly the bytes returned, so a caller
+    /// can perform a subsequent conditional write without a separate [`head`](Self::head) call (and
+    /// without the race that a read-then-head pair would introduce).
     ///
     /// Returns [`StorageError::NotFound`](crate::StorageError::NotFound) if no object exists.
-    async fn get(&self, key: &ObjectKey) -> Result<Bytes>;
+    async fn get(&self, key: &ObjectKey) -> Result<GetResult>;
 
-    /// Reads the half-open byte range `range` (`start..end`) of the object at `key`.
+    /// Reads the half-open byte range `range` (`start..end`) of the object at `key`, together with
+    /// the object's metadata.
+    ///
+    /// [`GetResult::data`] is the requested slice; [`GetResult::meta`] describes the whole object
+    /// (including its current ETag).
     ///
     /// Returns [`StorageError::NotFound`](crate::StorageError::NotFound) if no object exists, or
     /// [`StorageError::InvalidRange`](crate::StorageError::InvalidRange) if the range is malformed or
     /// extends beyond the object.
-    async fn get_range(&self, key: &ObjectKey, range: Range<u64>) -> Result<Bytes>;
+    async fn get_range(&self, key: &ObjectKey, range: Range<u64>) -> Result<GetResult>;
 
     /// Returns metadata (size, ETag, last-modified) for the object at `key` without its body.
     ///

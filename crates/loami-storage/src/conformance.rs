@@ -51,7 +51,11 @@ async fn put_get_roundtrip(provider: &dyn StorageProvider) {
     );
 
     let got = provider.get(&key).await.expect("get should succeed");
-    assert_eq!(got, data, "get must return exactly what was put");
+    assert_eq!(got.data, data, "get must return exactly what was put");
+    assert_eq!(
+        got.meta.etag, result.etag,
+        "get must return the etag of the bytes it returned, so callers never need a separate head"
+    );
 
     provider.delete(&key).await.expect("cleanup delete");
 }
@@ -111,7 +115,7 @@ async fn range_reads(provider: &dyn StorageProvider) {
         .await
         .expect("range read should succeed");
     assert_eq!(
-        middle,
+        middle.data,
         Bytes::from_static(b"234"),
         "range read must return the requested slice"
     );
@@ -198,7 +202,10 @@ async fn create_mode_cas(provider: &dyn StorageProvider) {
     }
 
     let got = provider.get(&key).await.expect("get should succeed");
-    assert_eq!(got, original, "a failed create must not modify the object");
+    assert_eq!(
+        got.data, original,
+        "a failed create must not modify the object"
+    );
 
     provider.delete(&key).await.expect("cleanup delete");
 }
@@ -239,7 +246,7 @@ async fn update_mode_cas(provider: &dyn StorageProvider) {
         "a successful update must produce a new etag"
     );
     assert_eq!(
-        provider.get(&key).await.expect("get"),
+        provider.get(&key).await.expect("get").data,
         Bytes::from_static(b"v2"),
         "update must have written the new value"
     );
@@ -253,7 +260,7 @@ async fn update_mode_cas(provider: &dyn StorageProvider) {
         other => panic!("update with a stale etag must fail with Precondition, got {other:?}"),
     }
     assert_eq!(
-        provider.get(&key).await.expect("get"),
+        provider.get(&key).await.expect("get").data,
         Bytes::from_static(b"v2"),
         "a failed update must not modify the object"
     );

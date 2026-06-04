@@ -11,7 +11,7 @@ A provider exposes a small object-store surface:
 
 | Operation | Purpose |
 | --- | --- |
-| `get` / `get_range` | read a whole object, or a byte range of one |
+| `get` / `get_range` | read a whole object (or a byte range) **plus its metadata, including the ETag** |
 | `head` | size + ETag + last-modified, without the body |
 | `put` | write, with a conditional mode (below) |
 | `delete` | remove an object (idempotent) |
@@ -47,16 +47,19 @@ let store = MemoryProvider::new();
 let key = ObjectKey::new("notes/hello");
 
 // Create only if absent; returns the new object's ETag.
-let written = store
+store
     .put(&key, Bytes::from_static(b"hi"), PutOptions::create())
     .await?;
 
-// Compare-and-swap: this only succeeds while the ETag still matches.
-store
-    .put(&key, Bytes::from_static(b"updated"), PutOptions::update(written.etag))
-    .await?;
+// A read returns the bytes *and* the object's metadata in one call — so the ETag belongs to
+// exactly the bytes you just read, with no separate `head` and no window for it to drift.
+let read = store.get(&key).await?;
+assert_eq!(read.data, Bytes::from_static(b"hi"));
 
-let value = store.get(&key).await?; // b"updated"
+// Compare-and-swap using the ETag from that same read.
+store
+    .put(&key, Bytes::from_static(b"updated"), PutOptions::update(read.meta.etag))
+    .await?;
 ```
 
 ## Implementing a provider
