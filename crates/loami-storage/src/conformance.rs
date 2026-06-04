@@ -17,8 +17,9 @@
 //! run against a persistent backend.
 
 use bytes::Bytes;
+use futures::{StreamExt, TryStreamExt};
 
-use crate::{Etag, ObjectKey, PutOptions, StorageError, StorageProvider};
+use crate::{Etag, ObjectKey, ObjectMeta, PutOptions, StorageError, StorageProvider};
 
 /// Runs the full conformance suite against `provider`, panicking on the first violation.
 pub async fn run_conformance_suite(provider: &dyn StorageProvider) {
@@ -33,6 +34,7 @@ pub async fn run_conformance_suite(provider: &dyn StorageProvider) {
     update_mode_cas(provider).await;
     invalid_keys_are_rejected(provider).await;
     canonical_keys_round_trip(provider).await;
+    list_streams_results(provider).await;
 }
 
 fn key(name: &str) -> ObjectKey {
@@ -150,7 +152,11 @@ async fn range_reads(provider: &dyn StorageProvider) {
 async fn list_by_prefix(provider: &dyn StorageProvider) {
     let prefix = "conformance/list/";
     // Start from a clean slate under the prefix.
-    for meta in provider.list(prefix).await.expect("list should succeed") {
+    for meta in provider
+        .list_all(prefix)
+        .await
+        .expect("list should succeed")
+    {
         provider.delete(&meta.key).await.expect("cleanup delete");
     }
 
@@ -166,7 +172,7 @@ async fn list_by_prefix(provider: &dyn StorageProvider) {
         .expect("put b");
 
     let mut listed: Vec<String> = provider
-        .list(prefix)
+        .list_all(prefix)
         .await
         .expect("list should succeed")
         .into_iter()
@@ -289,7 +295,7 @@ async fn update_mode_cas(provider: &dyn StorageProvider) {
 
 async fn list_uses_path_segment_prefix(provider: &dyn StorageProvider) {
     let root = "conformance/segment/";
-    for meta in provider.list(root).await.expect("list should succeed") {
+    for meta in provider.list_all(root).await.expect("list should succeed") {
         provider.delete(&meta.key).await.expect("cleanup delete");
     }
 
@@ -306,7 +312,7 @@ async fn list_uses_path_segment_prefix(provider: &dyn StorageProvider) {
 
     for prefix in ["conformance/segment/dir", "conformance/segment/dir/"] {
         let mut listed: Vec<String> = provider
-            .list(prefix)
+            .list_all(prefix)
             .await
             .expect("list should succeed")
             .into_iter()
@@ -369,7 +375,7 @@ async fn canonical_keys_round_trip(provider: &dyn StorageProvider) {
     );
 
     let listed = provider
-        .list("conformance/round.trip")
+        .list_all("conformance/round.trip")
         .await
         .expect("list should succeed");
     assert!(
@@ -378,4 +384,67 @@ async fn canonical_keys_round_trip(provider: &dyn StorageProvider) {
     );
 
     provider.delete(&key).await.expect("cleanup delete");
+}
+
+async fn list_streams_results(provider: &dyn StorageProvider) {
+    let prefix = "conformance/stream/";
+    for meta in provider
+        .list_all(prefix)
+        .await
+        .expect("list_all should succeed")
+    {
+        provider.delete(&meta.key).await.expect("cleanup delete");
+    }
+
+    let n = 25usize;
+    for i in 0..n {
+        let key = ObjectKey::new(format!("conformance/stream/k{i:02}"));
+        provider
+            .put(&key, Bytes::from_static(b"x"), PutOptions::overwrite())
+            .await
+            .expect("put should succeed");
+    }
+
+    // Draining the stream yields every object under the prefix, exactly once.
+    let drained: Vec<ObjectMeta> = provider
+        .list(prefix)
+        .try_collect()
+        .await
+        .expect("stream should drain");
+    assert_eq!(
+        drained.len(),
+        n,
+        "stream must yield every object under the prefix"
+    );
+    let unique: std::collections::BTreeSet<String> =
+        drained.iter().map(|m| m.key.as_str().to_owned()).collect();
+    assert_eq!(unique.len(), n, "stream must not duplicate objects");
+
+    // A caller can stop early without draining the whole prefix.
+    let first_five: Vec<ObjectMeta> = provider
+        .list(prefix)
+        .take(5)
+        .try_collect()
+        .await
+        .expect("take should work");
+    assert_eq!(first_five.len(), 5, "stream must honor take(k)");
+
+    // A prefix with no matches yields an empty stream.
+    let none: Vec<ObjectMeta> = provider
+        .list("conformance/stream/none")
+        .try_collect()
+        .await
+        .expect("empty stream should drain");
+    assert!(
+        none.is_empty(),
+        "a non-matching prefix must yield an empty stream"
+    );
+
+    for meta in provider
+        .list_all(prefix)
+        .await
+        .expect("list_all should succeed")
+    {
+        provider.delete(&meta.key).await.expect("cleanup delete");
+    }
 }

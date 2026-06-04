@@ -15,7 +15,7 @@ A provider exposes a small object-store surface:
 | `head` | size + ETag + last-modified, without the body |
 | `put` | write, with a conditional mode (below) |
 | `delete` | remove an object (idempotent) |
-| `list` | enumerate objects under a key prefix |
+| `list` / `list_all` | **stream** objects under a key prefix (lazy, constant-memory), or collect them into a `Vec` |
 
 ### Keys
 

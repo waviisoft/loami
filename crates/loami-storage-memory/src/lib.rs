@@ -13,6 +13,8 @@ use std::sync::Mutex;
 use std::time::SystemTime;
 
 use bytes::Bytes;
+use futures::stream::{self, BoxStream};
+use futures::StreamExt;
 use loami_storage::{
     Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult, Result, StorageError,
     StorageProvider,
@@ -134,13 +136,19 @@ impl StorageProvider for MemoryProvider {
         Ok(())
     }
 
-    async fn list(&self, prefix: &str) -> Result<Vec<ObjectMeta>> {
-        let objects = self.objects.lock().expect("lock poisoned");
-        Ok(objects
-            .iter()
-            .filter(|(key, _)| key_has_prefix(key.as_str(), prefix))
-            .map(|(key, entry)| object_meta(key, entry))
-            .collect())
+    fn list(&self, prefix: &str) -> BoxStream<'_, Result<ObjectMeta>> {
+        // Snapshot the matching entries under the lock, then stream the snapshot (sorted for a
+        // deterministic order). The lock is not held while the stream is consumed.
+        let mut metas: Vec<ObjectMeta> = {
+            let objects = self.objects.lock().expect("lock poisoned");
+            objects
+                .iter()
+                .filter(|(key, _)| key_has_prefix(key.as_str(), prefix))
+                .map(|(key, entry)| object_meta(key, entry))
+                .collect()
+        };
+        metas.sort_by(|a, b| a.key.as_str().cmp(b.key.as_str()));
+        stream::iter(metas.into_iter().map(Ok::<_, StorageError>)).boxed()
     }
 }
 

@@ -19,7 +19,8 @@
 //! as a future enhancement.
 
 use bytes::Bytes;
-use futures::TryStreamExt;
+use futures::stream::BoxStream;
+use futures::StreamExt;
 use loami_storage::{
     Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult, Result, StorageError,
     StorageProvider,
@@ -191,15 +192,15 @@ impl StorageProvider for FsProvider {
         }
     }
 
-    async fn list(&self, prefix: &str) -> Result<Vec<ObjectMeta>> {
+    fn list(&self, prefix: &str) -> BoxStream<'_, Result<ObjectMeta>> {
+        // object_store's `list` is already a lazy, constant-memory stream that pages internally;
+        // map each entry onto the contract's types. The returned stream is owned ('static), so it
+        // does not borrow `prefix_path` or `self`.
         let prefix_path = Path::from(prefix);
-        let metas: Vec<object_store::ObjectMeta> = self
-            .store
+        self.store
             .list(Some(&prefix_path))
-            .try_collect()
-            .await
-            .map_err(backend)?;
-        metas.iter().map(to_meta).collect()
+            .map(|res| to_meta(&res.map_err(backend)?))
+            .boxed()
     }
 }
 

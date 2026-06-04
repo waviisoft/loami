@@ -489,6 +489,7 @@ version = "0.0.1"
 dependencies = [
  "async-trait",
  "bytes",
+ "futures",
  "thiserror",
 ]
 
@@ -511,6 +512,7 @@ version = "0.0.1"
 dependencies = [
  "async-trait",
  "bytes",
+ "futures",
  "loami-storage",
  "tokio",
 ]
