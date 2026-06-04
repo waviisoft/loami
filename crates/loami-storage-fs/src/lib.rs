@@ -70,22 +70,19 @@ fn map_err(key: &ObjectKey, err: object_store::Error) -> StorageError {
 }
 
 /// Converts an object-store [`object_store::ObjectMeta`] to the contract's [`ObjectMeta`].
-fn to_meta(meta: object_store::ObjectMeta) -> Result<ObjectMeta> {
-    let object_store::ObjectMeta {
-        location,
-        last_modified,
-        size,
-        e_tag,
-        ..
-    } = meta;
-    let etag = e_tag.map(Etag::new).ok_or_else(|| StorageError::Backend {
-        source: format!("object store returned no etag for {location}").into(),
-    })?;
+fn to_meta(meta: &object_store::ObjectMeta) -> Result<ObjectMeta> {
+    let etag = meta
+        .e_tag
+        .clone()
+        .map(Etag::new)
+        .ok_or_else(|| StorageError::Backend {
+            source: format!("object store returned no etag for {}", meta.location).into(),
+        })?;
     Ok(ObjectMeta {
-        key: ObjectKey::new(location.to_string()),
-        size,
+        key: ObjectKey::new(meta.location.to_string()),
+        size: meta.size,
         etag,
-        last_modified: Some(last_modified.into()),
+        last_modified: Some(meta.last_modified.into()),
     })
 }
 
@@ -95,7 +92,7 @@ impl StorageProvider for FsProvider {
         key.validate()?;
         let path = Path::from(key.as_str());
         let result = self.store.get(&path).await.map_err(|e| map_err(key, e))?;
-        let meta = to_meta(result.meta.clone())?;
+        let meta = to_meta(&result.meta)?;
         let data = result.bytes().await.map_err(|e| map_err(key, e))?;
         Ok(GetResult { data, meta })
     }
@@ -119,7 +116,7 @@ impl StorageProvider for FsProvider {
             // object_store rejects a zero-length range; the contract returns empty bytes.
             return Ok(GetResult {
                 data: Bytes::new(),
-                meta: to_meta(head)?,
+                meta: to_meta(&head)?,
             });
         }
         let data = self
@@ -129,7 +126,7 @@ impl StorageProvider for FsProvider {
             .map_err(|e| map_err(key, e))?;
         Ok(GetResult {
             data,
-            meta: to_meta(head)?,
+            meta: to_meta(&head)?,
         })
     }
 
@@ -137,7 +134,7 @@ impl StorageProvider for FsProvider {
         key.validate()?;
         let path = Path::from(key.as_str());
         let meta = self.store.head(&path).await.map_err(|e| map_err(key, e))?;
-        to_meta(meta)
+        to_meta(&meta)
     }
 
     async fn put(&self, key: &ObjectKey, data: Bytes, options: PutOptions) -> Result<PutResult> {
@@ -200,7 +197,7 @@ impl StorageProvider for FsProvider {
             .try_collect()
             .await
             .map_err(backend)?;
-        metas.into_iter().map(to_meta).collect()
+        metas.iter().map(to_meta).collect()
     }
 }
 
