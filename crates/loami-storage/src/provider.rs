@@ -3,6 +3,8 @@
 use std::ops::Range;
 
 use bytes::Bytes;
+use futures::stream::BoxStream;
+use futures::TryStreamExt;
 
 use crate::{GetResult, ObjectKey, ObjectMeta, PutOptions, PutResult, Result};
 
@@ -56,10 +58,21 @@ pub trait StorageProvider: Send + Sync {
     /// Deleting a key that does not exist succeeds (the operation is idempotent).
     async fn delete(&self, key: &ObjectKey) -> Result<()>;
 
-    /// Lists metadata for all objects under `prefix`, matched on `/`-segment boundaries
+    /// Streams metadata for all objects under `prefix`, matched on `/`-segment boundaries
     /// (directory-style), not as a raw string prefix. A trailing `/` on `prefix` is ignored, and an
     /// empty `prefix` lists every object. For example, `list("a/b")` returns `a/b/c` but not
     /// `a/bc`. Whether an object whose key is exactly `prefix` is included is unspecified; the
     /// engine never lists a prefix that is also an object key.
-    async fn list(&self, prefix: &str) -> Result<Vec<ObjectMeta>>;
+    ///
+    /// The stream is lazy — a caller may stop early (e.g. via `take`) without enumerating the whole
+    /// prefix — and constant-memory for backends that stream natively. The **order of results is
+    /// unspecified** and may differ between providers; sort if you need a stable order. Use
+    /// [`list_all`](Self::list_all) when the result set is bounded and a `Vec` is more convenient.
+    fn list(&self, prefix: &str) -> BoxStream<'_, Result<ObjectMeta>>;
+
+    /// Collects [`list`](Self::list) into a `Vec`. Convenience for callers that want every entry and
+    /// know the result set is bounded.
+    async fn list_all(&self, prefix: &str) -> Result<Vec<ObjectMeta>> {
+        self.list(prefix).try_collect().await
+    }
 }
