@@ -1,3 +1,10 @@
+<p align="center">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="./brand/loami-lockup-dark.svg">
+    <img src="./brand/loami-lockup.svg" alt="Loami" width="360">
+  </picture>
+</p>
+
 # Introduction
 
 **Loami** is _fertile ground for your backend_ — an embeddable backend substrate for early-stage
