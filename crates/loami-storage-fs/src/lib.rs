@@ -101,7 +101,9 @@ impl StorageProvider for FsProvider {
         key.validate()?;
         let path = Path::from(key.as_str());
         // object_store does not guarantee a uniform error for an out-of-bounds range, so validate
-        // against the object's size first. The head also supplies the metadata for the result.
+        // against the object's size first. The head also supplies the metadata for the result;
+        // reads are not serialized against writes, so this is consistent with the returned bytes
+        // only under the single-writer model (see the module docs).
         let head = self.store.head(&path).await.map_err(|e| map_err(key, e))?;
         let size = head.size;
         if range.start > range.end || range.end > size {
