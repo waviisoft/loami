@@ -33,8 +33,11 @@ cluster.
 
 - **Memory** (`loami-storage-memory`) — an in-process store for tests, CI, and ephemeral use. It is
   also the contract's reference implementation.
+- **Filesystem** (`loami-storage-fs`) — a local-filesystem store rooted at a directory, built on
+  `object_store`. For local development and single-node persistence. It emulates the conditional
+  `Update` (compare-and-swap) that the local backend lacks, under a single-writer assumption.
 
-More providers (local filesystem, Azure Blob, …) are tracked on the [roadmap](./roadmap.md).
+More providers (Azure Blob, …) are tracked on the [roadmap](./roadmap.md).
 
 ## Using a provider
 
