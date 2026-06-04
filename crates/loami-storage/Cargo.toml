@@ -1,0 +1,23 @@
+[package]
+name = "loami-storage"
+version = "0.0.1"
+description = "Storage provider contract for Loami: the StorageProvider trait, shared types, and a conformance test kit."
+rust-version = "1.80"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Enables the reusable conformance suite. Providers turn this on in their dev-dependencies to test
+# their implementation against the contract.
+conformance = []
+
+[dependencies]
+async-trait = "0.1"
+bytes = "1"
+thiserror = "2"
