@@ -65,8 +65,24 @@ store
 ## Implementing a provider
 
 Every provider must pass the shared **conformance suite**, which asserts the full contract — including
-the CAS semantics above. Enable the `conformance` feature of `loami-storage` in your dev-dependencies
-and call it from a test:
+the CAS semantics above. The suite lives behind the `conformance` feature of `loami-storage`; enable
+it as a dev-dependency:
+
+```toml
+# Cargo.toml
+[dependencies]
+loami-storage = "0.0.1"
+
+[dev-dependencies]
+loami-storage = { version = "0.0.1", features = ["conformance"] }
+tokio = { version = "1", features = ["macros", "rt"] }
+```
+
+Listing the crate in both sections lets Cargo enable `conformance` for the test build only — your
+provider's release build never pulls the suite in. (Within this workspace the providers use a path
+dependency, e.g. `{ path = "../loami-storage", features = ["conformance"] }`.)
+
+Then call it from a test:
 
 ```rust
 #[tokio::test]
