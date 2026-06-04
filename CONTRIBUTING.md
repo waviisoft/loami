@@ -11,6 +11,8 @@ direction.
 - **Keep CI green.** `fmt`, `clippy -D warnings`, and the full test suite must pass.
 - **Document public items.** `missing_docs` is a warning at the workspace level; public API needs
   doc comments (with an example where it helps).
+- **Docs track code.** A change to user-facing behavior updates the guide (`docs/`) in the same PR —
+  with a usage example — not just the rustdoc API reference.
 
 ## Local development
 

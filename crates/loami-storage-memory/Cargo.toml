@@ -1,0 +1,22 @@
+[package]
+name = "loami-storage-memory"
+version = "0.0.1"
+description = "In-memory StorageProvider for Loami — a zero-dependency reference implementation for tests and mem://."
+rust-version = "1.80"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+loami-storage = { path = "../loami-storage" }
+async-trait = "0.1"
+bytes = "1"
+
+[dev-dependencies]
+loami-storage = { path = "../loami-storage", features = ["conformance"] }
+tokio = { version = "1", features = ["macros", "rt"] }

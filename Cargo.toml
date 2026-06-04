@@ -1,6 +1,10 @@
 [workspace]
 resolver = "2"
-members = ["crates/loami"]
+members = [
+    "crates/loami",
+    "crates/loami-storage",
+    "crates/loami-storage-memory",
+]
 
 [workspace.package]
 edition = "2021"
