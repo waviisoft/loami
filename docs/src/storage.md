@@ -39,36 +39,14 @@ cluster.
 
 ## Built-in providers
 
-- **Memory** (`loami-storage-memory`) — an in-process store for tests, CI, and ephemeral use. It is
-  also the contract's reference implementation.
-- **Filesystem** (`loami-storage-fs`) — a local-filesystem store rooted at a directory, built on
-  `object_store`. For local development and single-node persistence. It emulates the conditional
-  `Update` (compare-and-swap) that the local backend lacks, under a single-writer assumption.
-- **Azure Blob** (`loami-storage-azure`) — Azure Blob Storage (`azure://`), built on `object_store`,
-  with native conditional writes (CAS) and lazy listing. Credentials use the standard Azure
-  conventions — `AzureProvider::from_env(container)` reads the usual `AZURE_STORAGE_*` variables
-  (account key, SAS, service principal, managed identity), or pass a configured
-  `MicrosoftAzureBuilder`. Local/CI testing runs against the Azurite emulator.
+Each provider has its own page covering its storage mechanism, callouts, and configuration. They are
+constructed differently but used identically — that interchangeability is the point of the contract.
 
-## Constructing a provider
-
-Each provider is constructed differently; everything *after* construction is identical — that
-interchangeability is the whole point of the contract.
-
-```rust
-use loami_storage_memory::MemoryProvider;
-use loami_storage_fs::FsProvider;
-use loami_storage_azure::AzureProvider;
-
-// In-memory — tests, CI, ephemeral use.
-let mem = MemoryProvider::new();
-
-// Local filesystem — rooted at an existing directory.
-let fs = FsProvider::new("./data")?;
-
-// Azure Blob — credentials from the standard AZURE_STORAGE_* environment.
-let azure = AzureProvider::from_env("my-container")?;
-```
+- **[Memory](./storage/memory.md)** (`loami-storage-memory`) — in-process; tests, CI, ephemeral use.
+- **[Filesystem](./storage/fs.md)** (`loami-storage-fs`) — local files (`file://`); development and
+  single-node persistence.
+- **[Azure Blob](./storage/azure.md)** (`loami-storage-azure`) — Azure Blob (`azure://`); native
+  compare-and-swap and lazy listing.
 
 ## Using a provider
 
