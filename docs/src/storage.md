@@ -37,10 +37,13 @@ error, so keys round-trip byte-for-byte across every backend and path-traversal 
 These are the primitives Loami uses for atomic commits, and later for single-writer fencing across a
 cluster.
 
-## Built-in providers
+## Officially-supported providers
 
-Each provider has its own page covering its storage mechanism, callouts, and configuration. They are
-constructed differently but used identically — that interchangeability is the point of the contract.
+These providers are maintained in this repository. Each has its own page covering its storage
+mechanism, callouts, and configuration. They are constructed differently but used identically — that
+interchangeability is the point of the contract. The engine itself stays agnostic: it registers only
+`mem` by default, and an application registers the providers it uses (see
+[Connecting](./document-store.md#connecting)).
 
 - **[Memory](./storage/memory.md)** (`loami-storage-memory`) — in-process; tests, CI, ephemeral use.
 - **[Filesystem](./storage/fs.md)** (`loami-storage-fs`) — local files (`file://`); development and

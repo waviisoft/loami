@@ -7,7 +7,7 @@ use futures::TryStreamExt;
 use loami_storage::{ObjectKey, PutOptions, StorageError, StorageProvider};
 use serde_json::Value;
 
-use crate::{DocId, Document, Error, Result};
+use crate::{DocId, Document, Error, Registry, Result};
 
 /// A handle to a Loami document store, backed by a storage provider.
 ///
@@ -35,6 +35,31 @@ pub struct Loami {
 }
 
 impl Loami {
+    /// Opens a store, choosing the backend from a connection string by resolving its scheme through
+    /// the [default provider registry](Registry). A scheme is available exactly when a provider is
+    /// registered for it: only `mem://` (in-memory) is registered by default. Register any other
+    /// provider — a filesystem or cloud backend, or your own — with a [`Registry`] and
+    /// [`connect_with`](Self::connect_with). The same program runs across environments by changing
+    /// only the URL. For a backend you'd rather build directly, use [`open`](Self::open).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Url`] for a malformed string, [`Error::UnknownScheme`] for a scheme no
+    /// registered provider handles, or a storage error if the provider cannot be constructed.
+    pub fn connect(url: &str) -> Result<Self> {
+        Self::connect_with(&Registry::default(), url)
+    }
+
+    /// Like [`connect`](Self::connect), but resolves the scheme through `registry` — so you can
+    /// register custom providers (or restrict which are available) before connecting.
+    ///
+    /// # Errors
+    ///
+    /// As [`connect`](Self::connect).
+    pub fn connect_with(registry: &Registry, url: &str) -> Result<Self> {
+        Ok(Self::open(registry.resolve(url)?))
+    }
+
     /// Opens a store over an existing storage provider.
     #[must_use]
     pub fn open(provider: Arc<dyn StorageProvider>) -> Self {
@@ -190,9 +215,100 @@ fn id_from_key(key: &str, collection: &str) -> DocId {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use loami_storage_fs::FsProvider;
+    use futures::stream::{self, BoxStream};
+    use futures::StreamExt;
+    use loami_storage::{Etag, GetResult, ObjectMeta, PutMode, PutResult};
     use loami_storage_memory::MemoryProvider;
     use serde_json::json;
+    use std::collections::HashMap;
+    use std::sync::Mutex;
+
+    // A minimal in-test `StorageProvider`, separate from the real providers, so the engine's tests
+    // depend on no provider crate beyond the in-memory default. Objects live in a shared map; only
+    // the operations the engine uses (get / put / delete / list) are implemented.
+    #[derive(Default)]
+    struct TestProvider {
+        objects: Arc<Mutex<HashMap<ObjectKey, Bytes>>>,
+    }
+
+    #[async_trait::async_trait]
+    impl StorageProvider for TestProvider {
+        async fn get(&self, key: &ObjectKey) -> loami_storage::Result<GetResult> {
+            let data = self
+                .objects
+                .lock()
+                .unwrap()
+                .get(key)
+                .cloned()
+                .ok_or_else(|| StorageError::NotFound { key: key.clone() })?;
+            let meta = ObjectMeta {
+                key: key.clone(),
+                size: data.len() as u64,
+                etag: Etag::new("0"),
+                last_modified: None,
+            };
+            Ok(GetResult { data, meta })
+        }
+
+        async fn get_range(
+            &self,
+            _key: &ObjectKey,
+            _range: std::ops::Range<u64>,
+        ) -> loami_storage::Result<GetResult> {
+            unimplemented!("test provider does not implement get_range")
+        }
+
+        async fn head(&self, _key: &ObjectKey) -> loami_storage::Result<ObjectMeta> {
+            unimplemented!("test provider does not implement head")
+        }
+
+        async fn put(
+            &self,
+            key: &ObjectKey,
+            data: Bytes,
+            options: PutOptions,
+        ) -> loami_storage::Result<PutResult> {
+            let mut objects = self.objects.lock().unwrap();
+            if matches!(options.mode, PutMode::Create) && objects.contains_key(key) {
+                return Err(StorageError::AlreadyExists { key: key.clone() });
+            }
+            objects.insert(key.clone(), data);
+            Ok(PutResult {
+                etag: Etag::new("0"),
+            })
+        }
+
+        async fn delete(&self, key: &ObjectKey) -> loami_storage::Result<()> {
+            self.objects.lock().unwrap().remove(key);
+            Ok(())
+        }
+
+        fn list(&self, prefix: &str) -> BoxStream<'_, loami_storage::Result<ObjectMeta>> {
+            let prefix = prefix.strip_suffix('/').unwrap_or(prefix).to_owned();
+            let metas: Vec<loami_storage::Result<ObjectMeta>> = self
+                .objects
+                .lock()
+                .unwrap()
+                .iter()
+                .filter(|(key, _)| {
+                    let key = key.as_str();
+                    prefix.is_empty()
+                        || (key.len() > prefix.len()
+                            && key.starts_with(&prefix)
+                            && key.as_bytes()[prefix.len()] == b'/')
+                })
+                .map(|(key, data)| {
+                    Ok(ObjectMeta {
+                        key: key.clone(),
+                        size: data.len() as u64,
+                        etag: Etag::new("0"),
+                        last_modified: None,
+                    })
+                })
+                .collect();
+            stream::iter(metas).boxed()
+        }
+    }
 
     async fn exercise(db: Loami) {
         let tasks = db.collection("tasks").unwrap();
@@ -245,9 +361,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn document_store_on_filesystem() {
-        let dir = tempfile::tempdir().unwrap();
-        exercise(Loami::open(Arc::new(FsProvider::new(dir.path()).unwrap()))).await;
+    async fn document_store_on_test_provider() {
+        // The same engine drives a second, independent provider — proving it is backend-agnostic.
+        exercise(Loami::open(Arc::new(TestProvider::default()))).await;
     }
 
     #[test]
@@ -255,6 +371,70 @@ mod tests {
         let db = Loami::open(Arc::new(MemoryProvider::new()));
         for bad in ["", "a/b", "..", "has space"] {
             assert!(db.collection(bad).is_err(), "{bad:?} should be rejected");
+        }
+    }
+
+    #[tokio::test]
+    async fn connect_mem() {
+        let db = Loami::connect("mem://").unwrap();
+        let tasks = db.collection("tasks").unwrap();
+        let id = tasks.insert(json!({ "x": 1 })).await.unwrap();
+        assert!(tasks.get(&id).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn connect_requires_provider_registration() {
+        // The default registry knows only `mem`; any other scheme is rejected until registered.
+        assert!(matches!(
+            Loami::connect("test://x"),
+            Err(Error::UnknownScheme { .. })
+        ));
+
+        // Once the application registers a provider for the scheme, the same URL resolves and works.
+        let mut registry = Registry::default();
+        registry.register("test", |_rest| {
+            let provider: Arc<dyn StorageProvider> = Arc::new(TestProvider::default());
+            Ok(provider)
+        });
+
+        let db = Loami::connect_with(&registry, "test://x").unwrap();
+        let id = db
+            .collection("tasks")
+            .unwrap()
+            .insert(json!({ "x": 1 }))
+            .await
+            .unwrap();
+        assert!(db
+            .collection("tasks")
+            .unwrap()
+            .get(&id)
+            .await
+            .unwrap()
+            .is_some());
+    }
+
+    #[test]
+    fn connect_rejects_bad_urls() {
+        assert!(Loami::connect("nope").is_err()); // no scheme separator
+        assert!(Loami::connect("ftp://x").is_err()); // unregistered scheme
+    }
+
+    #[test]
+    fn unknown_scheme_reports_registered() {
+        // A registry with only a custom scheme — the built-ins are absent.
+        let mut registry = Registry::empty();
+        registry.register("test", |_rest| {
+            let provider: Arc<dyn StorageProvider> = Arc::new(TestProvider::default());
+            Ok(provider)
+        });
+
+        // An unregistered scheme reports what is registered.
+        let err = Loami::connect_with(&registry, "mem://")
+            .err()
+            .expect("mem:// is not registered in this registry");
+        match err {
+            Error::UnknownScheme { registered, .. } => assert_eq!(registered, "test"),
+            other => panic!("expected UnknownScheme, got {other:?}"),
         }
     }
 }
