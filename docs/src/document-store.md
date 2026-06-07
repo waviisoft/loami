@@ -19,19 +19,22 @@ tasks.delete(&id).await?;
 
 ## Connecting
 
-`Loami::connect(url)` picks the storage backend from a connection string, so the same program runs
+`Loami::connect(url)` resolves the URL's scheme through a provider registry, so the same program runs
 across environments by changing only the URL:
 
 ```rust
-let db = Loami::connect("mem://")?;                // CI / tests — ephemeral, zero setup
-let db = Loami::connect("file://./data")?;         // local dev — persists on disk
-let db = Loami::connect("azure://my-container")?;  // prod — needs the `azure` feature + AZURE_STORAGE_* env
+let db = Loami::connect("mem://")?;          // CI / tests — ephemeral, zero setup
+let db = Loami::connect("file://./data")?;   // local dev — persists on disk
 ```
 
-`mem://` and `file://` are built in; `azure://` requires building Loami with the `azure` feature.
-The engine talks only to a [storage provider](./storage.md), so backends are pluggable and the set
-grows over time — for one not covered by `connect`, construct a provider yourself and call
-`Loami::open(provider)`.
+A scheme is available exactly when a provider is registered for it:
+
+- **Built-in** (always available): `mem://` and `file://`.
+- **Officially-supported** (optional, enabled by a Cargo feature): for example the `azure` feature
+  registers `azure://<container>` (Azure Blob, using the standard `AZURE_STORAGE_*` credentials).
+- **Custom**: register your own with a `Registry` and `Loami::connect_with`.
+
+For a backend you'd rather build directly, construct a provider and call `Loami::open(provider)`.
 
 ## Model
 

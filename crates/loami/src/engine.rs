@@ -7,7 +7,7 @@ use futures::TryStreamExt;
 use loami_storage::{ObjectKey, PutOptions, StorageError, StorageProvider};
 use serde_json::Value;
 
-use crate::{DocId, Document, Error, Result};
+use crate::{DocId, Document, Error, Registry, Result};
 
 /// A handle to a Loami document store, backed by a storage provider.
 ///
@@ -35,42 +35,34 @@ pub struct Loami {
 }
 
 impl Loami {
-    /// Opens a store, choosing the storage backend from a connection string:
+    /// Opens a store, choosing the storage backend from a connection string by resolving its scheme
+    /// through the [default provider registry](Registry). A scheme is available exactly when a
+    /// provider is registered for it:
     ///
-    /// - `mem://` — in-memory (tests, CI; ephemeral)
-    /// - `file://<path>` — local filesystem rooted at `<path>` (the directory must exist)
-    /// - `azure://<container>` — Azure Blob (requires the `azure` feature; credentials from the
-    ///   standard `AZURE_STORAGE_*` environment)
+    /// - **Built-in** (always available): `mem://` (in-memory) and `file://<path>` (local filesystem).
+    /// - **Officially-supported** (optional, enabled by a Cargo feature): e.g. `azure://<container>`
+    ///   with the `azure` feature.
+    /// - **Custom**: register your own with a [`Registry`] and [`connect_with`](Self::connect_with).
     ///
-    /// The same program runs across environments by changing only the URL. For backends not covered
-    /// here, construct a provider and use [`open`](Self::open).
+    /// The same program runs across environments by changing only the URL. For a backend you'd
+    /// rather build directly, use [`open`](Self::open).
     ///
     /// # Errors
     ///
-    /// Returns [`Error::Url`] for a malformed string, an unknown scheme, or a scheme whose feature
-    /// is not enabled; or a storage error if the chosen provider cannot be constructed.
+    /// Returns [`Error::Url`] for a malformed string, [`Error::UnknownScheme`] for a scheme no
+    /// registered provider handles, or a storage error if the provider cannot be constructed.
     pub fn connect(url: &str) -> Result<Self> {
-        let bad = |reason| Error::Url {
-            url: url.to_owned(),
-            reason,
-        };
-        let (scheme, rest) = url.split_once("://").ok_or_else(|| {
-            bad("expected a connection string like \"mem://\", \"file://<path>\", or \"azure://<container>\"")
-        })?;
-        let provider: Arc<dyn StorageProvider> = match scheme {
-            "mem" => Arc::new(loami_storage_memory::MemoryProvider::new()),
-            "file" => Arc::new(loami_storage_fs::FsProvider::new(rest)?),
-            #[cfg(feature = "azure")]
-            "azure" => Arc::new(loami_storage_azure::AzureProvider::from_env(rest)?),
-            #[cfg(not(feature = "azure"))]
-            "azure" => {
-                return Err(bad(
-                    "azure:// requires building loami with the `azure` feature",
-                ))
-            }
-            _ => return Err(bad("unsupported scheme")),
-        };
-        Ok(Self::open(provider))
+        Self::connect_with(&Registry::default(), url)
+    }
+
+    /// Like [`connect`](Self::connect), but resolves the scheme through `registry` — so you can
+    /// register custom providers (or restrict which are available) before connecting.
+    ///
+    /// # Errors
+    ///
+    /// As [`connect`](Self::connect).
+    pub fn connect_with(registry: &Registry, url: &str) -> Result<Self> {
+        Ok(Self::open(registry.resolve(url)?))
     }
 
     /// Opens a store over an existing storage provider.
@@ -331,11 +323,45 @@ mod tests {
     #[test]
     fn connect_rejects_bad_urls() {
         assert!(Loami::connect("nope").is_err()); // no scheme separator
-        assert!(Loami::connect("ftp://x").is_err()); // unsupported scheme
+        assert!(Loami::connect("ftp://x").is_err()); // unregistered scheme
         #[cfg(not(feature = "azure"))]
         assert!(
             Loami::connect("azure://c").is_err(),
-            "azure:// should be rejected without the feature"
+            "azure:// should be unregistered without the feature"
         );
+    }
+
+    #[tokio::test]
+    async fn connect_with_custom_registry() {
+        // A registry with only a custom scheme — the built-ins are absent.
+        let mut registry = Registry::empty();
+        registry.register("ram", |_rest| {
+            let provider: Arc<dyn StorageProvider> = Arc::new(MemoryProvider::new());
+            Ok(provider)
+        });
+
+        let db = Loami::connect_with(&registry, "ram://").unwrap();
+        let id = db
+            .collection("t")
+            .unwrap()
+            .insert(json!({ "x": 1 }))
+            .await
+            .unwrap();
+        assert!(db
+            .collection("t")
+            .unwrap()
+            .get(&id)
+            .await
+            .unwrap()
+            .is_some());
+
+        // An unregistered scheme reports what is registered.
+        let err = Loami::connect_with(&registry, "mem://")
+            .err()
+            .expect("mem:// is not registered in this registry");
+        match err {
+            Error::UnknownScheme { registered, .. } => assert_eq!(registered, "ram"),
+            other => panic!("expected UnknownScheme, got {other:?}"),
+        }
     }
 }

@@ -24,12 +24,23 @@ pub enum Error {
         reason: &'static str,
     },
 
-    /// A connection string passed to [`Loami::connect`](crate::Loami::connect) could not be used.
+    /// A connection string passed to [`Loami::connect`](crate::Loami::connect) was malformed.
     #[error("invalid connection string {url:?}: {reason}")]
     Url {
         /// The offending connection string.
         url: String,
         /// Why it was rejected.
         reason: &'static str,
+    },
+
+    /// A connection string used a scheme that no registered provider handles.
+    #[error("unknown scheme {scheme:?} in {url:?}; registered schemes: {registered}")]
+    UnknownScheme {
+        /// The full connection string.
+        url: String,
+        /// The unrecognized scheme.
+        scheme: String,
+        /// The schemes that are registered, comma-separated.
+        registered: String,
     },
 }
