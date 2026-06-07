@@ -2,6 +2,7 @@
 
 [Introduction](./introduction.md)
 
+- [Document store](./document-store.md)
 - [Storage providers](./storage.md)
   - [Memory](./storage/memory.md)
   - [Filesystem](./storage/fs.md)

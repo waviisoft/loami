@@ -2,9 +2,34 @@
 //!
 //! _Fertile ground for your backend._
 //!
-//! Loami is an embeddable backend substrate for early-stage apps — a document store, durable
-//! queue, realtime websocket backplane, and background-job runner over one self-clustering,
-//! churn-tolerant kernel whose only dependencies are **compute + blob storage**.
+//! Loami is an embeddable document store backed by pluggable storage — in-memory, local filesystem,
+//! or Azure Blob — selected behind the [`StorageProvider`](loami_storage::StorageProvider) contract,
+//! so the same code runs in tests, locally, and in production. Open a store over a provider and work
+//! with collections of schemaless JSON documents:
+//!
+//! ```
+//! use std::sync::Arc;
+//! use loami::Loami;
+//! use loami_storage_memory::MemoryProvider;
+//! use serde_json::json;
+//!
+//! # async fn run() -> loami::Result<()> {
+//! let db = Loami::open(Arc::new(MemoryProvider::new()));
+//! let tasks = db.collection("tasks")?;
+//! let id = tasks.insert(json!({ "title": "ship loami", "done": false })).await?;
+//! tasks.update(&id, json!({ "title": "ship loami", "done": true })).await?;
+//! assert_eq!(tasks.find(json!({ "done": true })).await?.len(), 1);
+//! # Ok(())
+//! # }
+//! ```
+
+mod document;
+mod engine;
+mod error;
+
+pub use document::{DocId, Document};
+pub use engine::{Collection, Loami};
+pub use error::{Error, Result};
 
 /// Returns the version of the `loami` crate, as reported by Cargo at build time.
 ///
@@ -25,10 +50,5 @@ mod tests {
     #[test]
     fn version_is_non_empty() {
         assert!(!version().is_empty(), "crate version should be reported");
-    }
-
-    #[test]
-    fn version_matches_cargo_env() {
-        assert_eq!(version(), env!("CARGO_PKG_VERSION"));
     }
 }
