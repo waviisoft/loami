@@ -171,8 +171,8 @@ fn validate_name(name: &str) -> Result<()> {
     Ok(())
 }
 
-/// A document matches an object filter when every field in the filter equals the document's; a
-/// non-object filter matches everything.
+/// Returns whether `value` matches `filter`. An object filter matches when, for every field it
+/// contains, the document has an equal value for that field. A non-object filter matches everything.
 fn matches_filter(value: &Value, filter: &Value) -> bool {
     match filter {
         Value::Object(fields) => fields

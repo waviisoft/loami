@@ -22,9 +22,10 @@ tasks.delete(&id).await?;
 ## Backends
 
 The engine talks only to a [storage provider](./storage.md), so the *same code* runs on any backend
-— swap `MemoryProvider` for the filesystem or Azure provider and nothing else changes. (A
-`Loami::connect("mem://" | "file://…" | "azure://…")` convenience that picks the provider from a URL
-is coming next.)
+— swap `MemoryProvider` for any other provider and nothing else changes. Providers are pluggable and
+independently versioned (and may live in their own crates), so the set grows over time. (A
+`Loami::connect(url)` convenience that picks a provider from a connection string — `mem://`,
+`file://…`, and so on — is coming next.)
 
 ## Model
 

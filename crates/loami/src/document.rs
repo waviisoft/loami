@@ -22,9 +22,10 @@ impl DocId {
         &self.0
     }
 
-    /// Generates a fresh, unique id (a UUID v4).
+    /// Generates a fresh, unique id (a time-ordered UUID v7), so ids sort by creation time —
+    /// friendlier for listing and future indexing on backends that order keys lexicographically.
     pub(crate) fn generate() -> Self {
-        Self(uuid::Uuid::new_v4().to_string())
+        Self(uuid::Uuid::now_v7().to_string())
     }
 }
 
