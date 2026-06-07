@@ -28,6 +28,8 @@ thiserror = "2"
 uuid = { version = "1", features = ["v7"] }
 
 [dev-dependencies]
-loami-storage-fs = { path = "../loami-storage-fs" }
+# Tests run against the in-memory default plus a small purpose-built `TestProvider` (defined in the
+# test code), so the engine's tests depend on no provider crate beyond `mem`. `async-trait` is needed
+# only to implement that test provider's `StorageProvider`.
+async-trait = "0.1"
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
-tempfile = "3"
