@@ -12,7 +12,7 @@
 //! use serde_json::json;
 //!
 //! # async fn run() -> loami::Result<()> {
-//! // Pick the backend by URL: mem:// in tests, file://… for local dev, and so on.
+//! // mem:// is the built-in default; register other providers to add their schemes.
 //! let db = Loami::connect("mem://")?;
 //! let tasks = db.collection("tasks")?;
 //! let id = tasks.insert(json!({ "title": "ship loami", "done": false })).await?;

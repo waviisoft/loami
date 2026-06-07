@@ -20,21 +20,25 @@ tasks.delete(&id).await?;
 ## Connecting
 
 `Loami::connect(url)` resolves the URL's scheme through a provider registry, so the same program runs
-across environments by changing only the URL:
+across environments by changing only the URL. Only `mem://` is registered by default — the engine is
+agnostic about every other backend, which the application registers:
 
 ```rust
-let db = Loami::connect("mem://")?;          // CI / tests — ephemeral, zero setup
-let db = Loami::connect("file://./data")?;   // local dev — persists on disk
+use loami::{Loami, Registry};
+use loami_storage_fs::FsProvider;
+use std::sync::Arc;
+
+// mem:// works out of the box (CI, tests).
+let db = Loami::connect("mem://")?;
+
+// Register a provider to add its scheme, then switch environments by URL alone.
+let mut registry = Registry::default();
+registry.register("file", |path| Ok(Arc::new(FsProvider::new(path)?)));
+let db = Loami::connect_with(&registry, "file://./data")?;   // local dev — persists on disk
 ```
 
-A scheme is available exactly when a provider is registered for it:
-
-- **Built-in** (always available): `mem://` and `file://`.
-- **Officially-supported** (optional, enabled by a Cargo feature): for example the `azure` feature
-  registers `azure://<container>` (Azure Blob, using the standard `AZURE_STORAGE_*` credentials).
-- **Custom**: register your own with a `Registry` and `Loami::connect_with`.
-
-For a backend you'd rather build directly, construct a provider and call `Loami::open(provider)`.
+Any [storage provider](./storage.md) registers the same way — add its crate and register its scheme.
+For a backend you'd rather build directly, call `Loami::open(provider)`.
 
 ## Model
 

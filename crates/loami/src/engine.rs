@@ -35,17 +35,12 @@ pub struct Loami {
 }
 
 impl Loami {
-    /// Opens a store, choosing the storage backend from a connection string by resolving its scheme
-    /// through the [default provider registry](Registry). A scheme is available exactly when a
-    /// provider is registered for it:
-    ///
-    /// - **Built-in** (always available): `mem://` (in-memory) and `file://<path>` (local filesystem).
-    /// - **Officially-supported** (optional, enabled by a Cargo feature): e.g. `azure://<container>`
-    ///   with the `azure` feature.
-    /// - **Custom**: register your own with a [`Registry`] and [`connect_with`](Self::connect_with).
-    ///
-    /// The same program runs across environments by changing only the URL. For a backend you'd
-    /// rather build directly, use [`open`](Self::open).
+    /// Opens a store, choosing the backend from a connection string by resolving its scheme through
+    /// the [default provider registry](Registry). A scheme is available exactly when a provider is
+    /// registered for it: only `mem://` (in-memory) is registered by default. Register any other
+    /// provider — a filesystem or cloud backend, or your own — with a [`Registry`] and
+    /// [`connect_with`](Self::connect_with). The same program runs across environments by changing
+    /// only the URL. For a backend you'd rather build directly, use [`open`](Self::open).
     ///
     /// # Errors
     ///
@@ -297,11 +292,24 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn connect_file_persists_across_connections() {
+    async fn connect_file_requires_registration_then_works() {
         let dir = tempfile::tempdir().unwrap();
         let url = format!("file://{}", dir.path().display());
 
-        let id = Loami::connect(&url)
+        // `file` is not in the default registry — the engine is agnostic about it.
+        assert!(matches!(
+            Loami::connect(&url),
+            Err(Error::UnknownScheme { .. })
+        ));
+
+        // Once the application registers a filesystem provider, the same URL works and persists.
+        let mut registry = Registry::default();
+        registry.register("file", |path| {
+            let provider: Arc<dyn StorageProvider> = Arc::new(FsProvider::new(path)?);
+            Ok(provider)
+        });
+
+        let id = Loami::connect_with(&registry, &url)
             .unwrap()
             .collection("tasks")
             .unwrap()
@@ -310,7 +318,7 @@ mod tests {
             .unwrap();
 
         // A fresh connection to the same directory sees the data — the local-dev story.
-        let reopened = Loami::connect(&url).unwrap();
+        let reopened = Loami::connect_with(&registry, &url).unwrap();
         assert!(reopened
             .collection("tasks")
             .unwrap()
@@ -324,11 +332,6 @@ mod tests {
     fn connect_rejects_bad_urls() {
         assert!(Loami::connect("nope").is_err()); // no scheme separator
         assert!(Loami::connect("ftp://x").is_err()); // unregistered scheme
-        #[cfg(not(feature = "azure"))]
-        assert!(
-            Loami::connect("azure://c").is_err(),
-            "azure:// should be unregistered without the feature"
-        );
     }
 
     #[tokio::test]

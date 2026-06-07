@@ -683,7 +683,6 @@ dependencies = [
  "bytes",
  "futures",
  "loami-storage",
- "loami-storage-azure",
  "loami-storage-fs",
  "loami-storage-memory",
  "serde_json",

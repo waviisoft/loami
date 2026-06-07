@@ -1,8 +1,8 @@
 //! Connection-string scheme registry.
 //!
 //! [`Loami::connect`](crate::Loami::connect) resolves a URL's scheme through a [`Registry`]. The
-//! [`Default`] registry holds the providers built into this crate; register your own to support
-//! more schemes and pass the registry to [`Loami::connect_with`](crate::Loami::connect_with).
+//! [`Default`] registry holds only the in-memory provider; register others to support more schemes
+//! and pass the registry to [`Loami::connect_with`](crate::Loami::connect_with).
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -14,11 +14,11 @@ use crate::{Error, Result};
 /// Builds a provider from the part of a connection string after `scheme://`.
 type Factory = Arc<dyn Fn(&str) -> Result<Arc<dyn StorageProvider>> + Send + Sync>;
 
-/// Maps connection-string schemes (e.g. `mem`, `file`) to provider constructors.
+/// Maps connection-string schemes (e.g. `mem`) to provider constructors.
 ///
 /// Nothing about the available backends is hard-coded into `connect`; a backend is available exactly
-/// when its scheme is registered here. The built-in providers register themselves in
-/// [`Registry::default`], and callers can register additional ones (including their own) before
+/// when its scheme is registered here. [`Registry::default`] registers only the in-memory provider
+/// (`mem://`); register additional providers — a filesystem or cloud backend, or your own — before
 /// connecting.
 #[derive(Clone)]
 pub struct Registry {
@@ -71,25 +71,14 @@ impl Registry {
 }
 
 impl Default for Registry {
-    /// A registry with this crate's built-in providers registered: `mem://` and `file://` always,
-    /// plus `azure://` when the `azure` feature is enabled. Optional providers are present only when
-    /// their feature is on, so nothing advertises a backend the build does not include.
+    /// A registry with only the in-memory provider (`mem://`) registered — the engine's single
+    /// built-in default. Register any other provider (a filesystem or cloud backend, or your own)
+    /// before connecting.
     fn default() -> Self {
         let mut registry = Self::empty();
         registry.register("mem", |_rest| {
             let provider: Arc<dyn StorageProvider> =
                 Arc::new(loami_storage_memory::MemoryProvider::new());
-            Ok(provider)
-        });
-        registry.register("file", |rest| {
-            let provider: Arc<dyn StorageProvider> =
-                Arc::new(loami_storage_fs::FsProvider::new(rest)?);
-            Ok(provider)
-        });
-        #[cfg(feature = "azure")]
-        registry.register("azure", |rest| {
-            let provider: Arc<dyn StorageProvider> =
-                Arc::new(loami_storage_azure::AzureProvider::from_env(rest)?);
             Ok(provider)
         });
         registry
