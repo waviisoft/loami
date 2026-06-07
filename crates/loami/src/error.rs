@@ -23,4 +23,13 @@ pub enum Error {
         /// Why it was rejected.
         reason: &'static str,
     },
+
+    /// A connection string passed to [`Loami::connect`](crate::Loami::connect) could not be used.
+    #[error("invalid connection string {url:?}: {reason}")]
+    Url {
+        /// The offending connection string.
+        url: String,
+        /// Why it was rejected.
+        reason: &'static str,
+    },
 }

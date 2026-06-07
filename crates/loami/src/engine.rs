@@ -35,6 +35,44 @@ pub struct Loami {
 }
 
 impl Loami {
+    /// Opens a store, choosing the storage backend from a connection string:
+    ///
+    /// - `mem://` — in-memory (tests, CI; ephemeral)
+    /// - `file://<path>` — local filesystem rooted at `<path>` (the directory must exist)
+    /// - `azure://<container>` — Azure Blob (requires the `azure` feature; credentials from the
+    ///   standard `AZURE_STORAGE_*` environment)
+    ///
+    /// The same program runs across environments by changing only the URL. For backends not covered
+    /// here, construct a provider and use [`open`](Self::open).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Url`] for a malformed string, an unknown scheme, or a scheme whose feature
+    /// is not enabled; or a storage error if the chosen provider cannot be constructed.
+    pub fn connect(url: &str) -> Result<Self> {
+        let bad = |reason| Error::Url {
+            url: url.to_owned(),
+            reason,
+        };
+        let (scheme, rest) = url.split_once("://").ok_or_else(|| {
+            bad("expected a connection string like \"mem://\", \"file://<path>\", or \"azure://<container>\"")
+        })?;
+        let provider: Arc<dyn StorageProvider> = match scheme {
+            "mem" => Arc::new(loami_storage_memory::MemoryProvider::new()),
+            "file" => Arc::new(loami_storage_fs::FsProvider::new(rest)?),
+            #[cfg(feature = "azure")]
+            "azure" => Arc::new(loami_storage_azure::AzureProvider::from_env(rest)?),
+            #[cfg(not(feature = "azure"))]
+            "azure" => {
+                return Err(bad(
+                    "azure:// requires building loami with the `azure` feature",
+                ))
+            }
+            _ => return Err(bad("unsupported scheme")),
+        };
+        Ok(Self::open(provider))
+    }
+
     /// Opens a store over an existing storage provider.
     #[must_use]
     pub fn open(provider: Arc<dyn StorageProvider>) -> Self {
@@ -256,5 +294,48 @@ mod tests {
         for bad in ["", "a/b", "..", "has space"] {
             assert!(db.collection(bad).is_err(), "{bad:?} should be rejected");
         }
+    }
+
+    #[tokio::test]
+    async fn connect_mem() {
+        let db = Loami::connect("mem://").unwrap();
+        let tasks = db.collection("tasks").unwrap();
+        let id = tasks.insert(json!({ "x": 1 })).await.unwrap();
+        assert!(tasks.get(&id).await.unwrap().is_some());
+    }
+
+    #[tokio::test]
+    async fn connect_file_persists_across_connections() {
+        let dir = tempfile::tempdir().unwrap();
+        let url = format!("file://{}", dir.path().display());
+
+        let id = Loami::connect(&url)
+            .unwrap()
+            .collection("tasks")
+            .unwrap()
+            .insert(json!({ "x": 1 }))
+            .await
+            .unwrap();
+
+        // A fresh connection to the same directory sees the data — the local-dev story.
+        let reopened = Loami::connect(&url).unwrap();
+        assert!(reopened
+            .collection("tasks")
+            .unwrap()
+            .get(&id)
+            .await
+            .unwrap()
+            .is_some());
+    }
+
+    #[test]
+    fn connect_rejects_bad_urls() {
+        assert!(Loami::connect("nope").is_err()); // no scheme separator
+        assert!(Loami::connect("ftp://x").is_err()); // unsupported scheme
+        #[cfg(not(feature = "azure"))]
+        assert!(
+            Loami::connect("azure://c").is_err(),
+            "azure:// should be rejected without the feature"
+        );
     }
 }

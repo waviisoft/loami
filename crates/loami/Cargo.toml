@@ -15,8 +15,17 @@ authors.workspace = true
 [lints]
 workspace = true
 
+[features]
+default = []
+# Enables the `azure://` connection scheme. Off by default so the base build stays light (the Azure
+# provider pulls a full HTTP stack); memory and filesystem are always available.
+azure = ["dep:loami-storage-azure"]
+
 [dependencies]
 loami-storage = { path = "../loami-storage" }
+loami-storage-memory = { path = "../loami-storage-memory" }
+loami-storage-fs = { path = "../loami-storage-fs" }
+loami-storage-azure = { path = "../loami-storage-azure", optional = true }
 bytes = "1"
 futures = "0.3"
 serde_json = "1"
@@ -24,7 +33,5 @@ thiserror = "2"
 uuid = { version = "1", features = ["v7"] }
 
 [dev-dependencies]
-loami-storage-memory = { path = "../loami-storage-memory" }
-loami-storage-fs = { path = "../loami-storage-fs" }
 tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
 tempfile = "3"

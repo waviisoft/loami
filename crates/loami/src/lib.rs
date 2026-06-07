@@ -4,17 +4,16 @@
 //!
 //! Loami is an embeddable document store backed by pluggable storage — in-memory, local filesystem,
 //! or Azure Blob — selected behind the [`StorageProvider`](loami_storage::StorageProvider) contract,
-//! so the same code runs in tests, locally, and in production. Open a store over a provider and work
-//! with collections of schemaless JSON documents:
+//! so the same code runs in tests, locally, and in production. Open a store with a connection string
+//! (or any provider) and work with collections of schemaless JSON documents:
 //!
 //! ```
-//! use std::sync::Arc;
 //! use loami::Loami;
-//! use loami_storage_memory::MemoryProvider;
 //! use serde_json::json;
 //!
 //! # async fn run() -> loami::Result<()> {
-//! let db = Loami::open(Arc::new(MemoryProvider::new()));
+//! // Pick the backend by URL: mem:// (CI), file://… (local), azure://… (prod).
+//! let db = Loami::connect("mem://")?;
 //! let tasks = db.collection("tasks")?;
 //! let id = tasks.insert(json!({ "title": "ship loami", "done": false })).await?;
 //! tasks.update(&id, json!({ "title": "ship loami", "done": true })).await?;

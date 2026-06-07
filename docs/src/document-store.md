@@ -4,12 +4,10 @@ Loami stores schemaless JSON documents in collections, over any storage backend.
 provider, then insert, get, update, find, and delete documents:
 
 ```rust
-use std::sync::Arc;
 use loami::Loami;
-use loami_storage_memory::MemoryProvider;
 use serde_json::json;
 
-let db = Loami::open(Arc::new(MemoryProvider::new()));
+let db = Loami::connect("mem://")?;
 let tasks = db.collection("tasks")?;
 
 let id = tasks.insert(json!({ "title": "buy milk", "done": false })).await?; // -> DocId
@@ -19,13 +17,21 @@ let task = tasks.get(&id).await?;                                             //
 tasks.delete(&id).await?;
 ```
 
-## Backends
+## Connecting
 
-The engine talks only to a [storage provider](./storage.md), so the *same code* runs on any backend
-— swap `MemoryProvider` for any other provider and nothing else changes. Providers are pluggable and
-independently versioned (and may live in their own crates), so the set grows over time. (A
-`Loami::connect(url)` convenience that picks a provider from a connection string — `mem://`,
-`file://…`, and so on — is coming next.)
+`Loami::connect(url)` picks the storage backend from a connection string, so the same program runs
+across environments by changing only the URL:
+
+```rust
+let db = Loami::connect("mem://")?;                // CI / tests — ephemeral, zero setup
+let db = Loami::connect("file://./data")?;         // local dev — persists on disk
+let db = Loami::connect("azure://my-container")?;  // prod — needs the `azure` feature + AZURE_STORAGE_* env
+```
+
+`mem://` and `file://` are built in; `azure://` requires building Loami with the `azure` feature.
+The engine talks only to a [storage provider](./storage.md), so backends are pluggable and the set
+grows over time — for one not covered by `connect`, construct a provider yourself and call
+`Loami::open(provider)`.
 
 ## Model
 
