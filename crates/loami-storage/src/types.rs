@@ -46,18 +46,7 @@ impl ObjectKey {
             return Err(self.invalid("key must not start or end with '/'"));
         }
         for segment in key.split('/') {
-            if segment.is_empty() {
-                return Err(self.invalid("key must not contain an empty segment ('//')"));
-            }
-            if segment == "." || segment == ".." {
-                return Err(self.invalid("key segments must not be '.' or '..'"));
-            }
-            if !segment
-                .bytes()
-                .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
-            {
-                return Err(self.invalid("key segments may contain only [A-Za-z0-9._-]"));
-            }
+            validate_segment(segment).map_err(|reason| self.invalid(reason))?;
         }
         Ok(())
     }
@@ -68,6 +57,30 @@ impl ObjectKey {
             reason,
         }
     }
+}
+
+/// Validates that `segment` is a well-formed path segment: non-empty, neither `.` nor `..`, and
+/// containing only the characters `[A-Za-z0-9._-]`. On the first violation it returns a short,
+/// subject-free reason (e.g. `"may contain only [A-Za-z0-9._-]"`) that each caller wraps in its own
+/// error type.
+///
+/// A segment is the unit shared between object keys — a key is `/`-separated segments, validated by
+/// [`ObjectKey::validate`] — and other single-segment names such as a document-store collection name.
+/// Defining the rule here keeps those callers from drifting apart.
+pub fn validate_segment(segment: &str) -> std::result::Result<(), &'static str> {
+    if segment.is_empty() {
+        return Err("must not be empty");
+    }
+    if segment == "." || segment == ".." {
+        return Err("must not be '.' or '..'");
+    }
+    if !segment
+        .bytes()
+        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
+    {
+        return Err("may contain only [A-Za-z0-9._-]");
+    }
+    Ok(())
 }
 
 impl fmt::Display for ObjectKey {
