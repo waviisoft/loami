@@ -692,6 +692,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "loami-example-tasks"
+version = "0.0.1"
+dependencies = [
+ "loami",
+ "loami-storage",
+ "loami-storage-azure",
+ "loami-storage-fs",
+ "serde_json",
+ "tempfile",
+ "tokio",
+]
+
+[[package]]
 name = "loami-storage"
 version = "0.0.1"
 dependencies = [

@@ -1,0 +1,29 @@
+[package]
+name = "loami-example-tasks"
+version = "0.0.1"
+description = "Getting-started example for Loami: a tasks CRUD store over schemaless JSON documents."
+publish = false
+rust-version = "1.80"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+# Azure is opt-in so the default build (CI, local dev) stays light and cloud-free.
+azure = ["dep:loami-storage-azure"]
+
+[dependencies]
+loami = { path = "../../crates/loami" }
+loami-storage = { path = "../../crates/loami-storage" }
+loami-storage-fs = { path = "../../crates/loami-storage-fs" }
+loami-storage-azure = { path = "../../crates/loami-storage-azure", optional = true }
+serde_json = "1"
+tokio = { version = "1", features = ["macros", "rt-multi-thread"] }
+
+[dev-dependencies]
+tempfile = "3"
