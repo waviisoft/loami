@@ -28,5 +28,6 @@ mod types;
 pub use error::{Result, StorageError};
 pub use provider::StorageProvider;
 pub use types::{
-    validate_segment, Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult,
+    key_matches_prefix, validate_segment, Etag, GetResult, ObjectKey, ObjectMeta, PutMode,
+    PutOptions, PutResult,
 };

@@ -83,6 +83,25 @@ pub fn validate_segment(segment: &str) -> std::result::Result<(), &'static str> 
     Ok(())
 }
 
+/// Returns whether `key` falls under `prefix` for the purposes of
+/// [`list`](crate::StorageProvider::list) — matched on `/`-segment boundaries (directory-style), not
+/// as a raw string prefix. An empty `prefix` matches every key, a trailing `/` on `prefix` is
+/// ignored, and a key equal to `prefix` does not match (only keys strictly beneath it do). For
+/// example, `key_matches_prefix("a/b/c", "a/b")` is `true` while `key_matches_prefix("a/bc", "a/b")`
+/// is `false`.
+///
+/// This is the single definition of the contract's list-prefix rule, for providers that filter keys
+/// themselves (the in-memory backend, test doubles). Backends whose underlying store is already
+/// path-aware inherit the same semantics from it.
+#[must_use]
+pub fn key_matches_prefix(key: &str, prefix: &str) -> bool {
+    if prefix.is_empty() {
+        return true;
+    }
+    let prefix = prefix.strip_suffix('/').unwrap_or(prefix);
+    key.len() > prefix.len() && key.starts_with(prefix) && key.as_bytes()[prefix.len()] == b'/'
+}
+
 impl fmt::Display for ObjectKey {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str(&self.0)

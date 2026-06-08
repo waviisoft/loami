@@ -205,7 +205,7 @@ mod tests {
     use super::*;
     use futures::stream::{self, BoxStream};
     use futures::StreamExt;
-    use loami_storage::{Etag, GetResult, ObjectMeta, PutMode, PutResult};
+    use loami_storage::{key_matches_prefix, Etag, GetResult, ObjectMeta, PutMode, PutResult};
     use loami_storage_memory::MemoryProvider;
     use serde_json::json;
     use std::collections::HashMap;
@@ -272,19 +272,12 @@ mod tests {
         }
 
         fn list(&self, prefix: &str) -> BoxStream<'_, loami_storage::Result<ObjectMeta>> {
-            let prefix = prefix.strip_suffix('/').unwrap_or(prefix).to_owned();
             let metas: Vec<loami_storage::Result<ObjectMeta>> = self
                 .objects
                 .lock()
                 .unwrap()
                 .iter()
-                .filter(|(key, _)| {
-                    let key = key.as_str();
-                    prefix.is_empty()
-                        || (key.len() > prefix.len()
-                            && key.starts_with(&prefix)
-                            && key.as_bytes()[prefix.len()] == b'/')
-                })
+                .filter(|(key, _)| key_matches_prefix(key.as_str(), prefix))
                 .map(|(key, data)| {
                     Ok(ObjectMeta {
                         key: key.clone(),
