@@ -709,6 +709,7 @@ dependencies = [
  "bytes",
  "futures",
  "loami-storage",
+ "loami-storage-object-store",
  "object_store",
  "tokio",
 ]
@@ -721,6 +722,7 @@ dependencies = [
  "bytes",
  "futures",
  "loami-storage",
+ "loami-storage-object-store",
  "object_store",
  "tempfile",
  "tokio",
@@ -735,6 +737,16 @@ dependencies = [
  "futures",
  "loami-storage",
  "tokio",
+]
+
+[[package]]
+name = "loami-storage-object-store"
+version = "0.0.1"
+dependencies = [
+ "bytes",
+ "futures",
+ "loami-storage",
+ "object_store",
 ]
 
 [[package]]

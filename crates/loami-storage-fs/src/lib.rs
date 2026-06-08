@@ -20,12 +20,10 @@
 
 use bytes::Bytes;
 use futures::stream::BoxStream;
-use futures::StreamExt;
 use loami_storage::{
-    Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult, Result, StorageError,
-    StorageProvider,
+    GetResult, ObjectKey, ObjectMeta, PutOptions, PutResult, Result, StorageProvider,
 };
-use object_store::{path::Path, ObjectStore, ObjectStoreExt};
+use loami_storage_object_store as adapter;
 
 /// A [`StorageProvider`] backed by the local filesystem, rooted at a directory.
 #[derive(Debug)]
@@ -40,9 +38,11 @@ impl FsProvider {
     ///
     /// # Errors
     ///
-    /// Returns a [`StorageError::Backend`] if the root cannot be opened.
+    /// Returns a [`StorageError::Backend`](loami_storage::StorageError::Backend) if the root cannot
+    /// be opened.
     pub fn new(root: impl AsRef<std::path::Path>) -> Result<Self> {
-        let store = object_store::local::LocalFileSystem::new_with_prefix(root).map_err(backend)?;
+        let store = object_store::local::LocalFileSystem::new_with_prefix(root)
+            .map_err(adapter::backend_error)?;
         Ok(Self {
             store,
             write_lock: futures::lock::Mutex::new(()),
@@ -50,157 +50,37 @@ impl FsProvider {
     }
 }
 
-/// Wraps an arbitrary object-store error as a backend error.
-fn backend(err: object_store::Error) -> StorageError {
-    StorageError::Backend {
-        source: Box::new(err),
-    }
-}
-
-/// Maps an object-store error to the contract's error type, preserving the conditional-write and
-/// not-found cases that the conformance suite checks for.
-fn map_err(key: &ObjectKey, err: object_store::Error) -> StorageError {
-    match err {
-        object_store::Error::NotFound { .. } => StorageError::NotFound { key: key.clone() },
-        object_store::Error::AlreadyExists { .. } => {
-            StorageError::AlreadyExists { key: key.clone() }
-        }
-        object_store::Error::Precondition { .. } => StorageError::Precondition { key: key.clone() },
-        other => backend(other),
-    }
-}
-
-/// Converts an object-store [`object_store::ObjectMeta`] to the contract's [`ObjectMeta`].
-fn to_meta(meta: &object_store::ObjectMeta) -> Result<ObjectMeta> {
-    let etag = meta
-        .e_tag
-        .clone()
-        .map(Etag::new)
-        .ok_or_else(|| StorageError::Backend {
-            source: format!("object store returned no etag for {}", meta.location).into(),
-        })?;
-    Ok(ObjectMeta {
-        key: ObjectKey::new(meta.location.to_string()),
-        size: meta.size,
-        etag,
-        last_modified: Some(meta.last_modified.into()),
-    })
-}
-
 #[async_trait::async_trait]
 impl StorageProvider for FsProvider {
     async fn get(&self, key: &ObjectKey) -> Result<GetResult> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
-        let result = self.store.get(&path).await.map_err(|e| map_err(key, e))?;
-        let meta = to_meta(&result.meta)?;
-        let data = result.bytes().await.map_err(|e| map_err(key, e))?;
-        Ok(GetResult { data, meta })
+        adapter::get(&self.store, key).await
     }
 
     async fn get_range(&self, key: &ObjectKey, range: std::ops::Range<u64>) -> Result<GetResult> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
-        // object_store does not guarantee a uniform error for an out-of-bounds range, so validate
-        // against the object's size first. The head also supplies the metadata for the result;
-        // reads are not serialized against writes, so this is consistent with the returned bytes
-        // only under the single-writer model (see the module docs).
-        let head = self.store.head(&path).await.map_err(|e| map_err(key, e))?;
-        let size = head.size;
-        if range.start > range.end || range.end > size {
-            return Err(StorageError::InvalidRange {
-                key: key.clone(),
-                start: range.start,
-                end: range.end,
-                size,
-            });
-        }
-        if range.start == range.end {
-            // object_store rejects a zero-length range; the contract returns empty bytes.
-            return Ok(GetResult {
-                data: Bytes::new(),
-                meta: to_meta(&head)?,
-            });
-        }
-        let data = self
-            .store
-            .get_range(&path, range)
-            .await
-            .map_err(|e| map_err(key, e))?;
-        Ok(GetResult {
-            data,
-            meta: to_meta(&head)?,
-        })
+        // Reads are not serialized against writes, so the result is consistent with the returned
+        // bytes only under the single-writer model (see the module docs).
+        adapter::get_range(&self.store, key, range).await
     }
 
     async fn head(&self, key: &ObjectKey) -> Result<ObjectMeta> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
-        let meta = self.store.head(&path).await.map_err(|e| map_err(key, e))?;
-        to_meta(&meta)
+        adapter::head(&self.store, key).await
     }
 
     async fn put(&self, key: &ObjectKey, data: Bytes, options: PutOptions) -> Result<PutResult> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
+        // LocalFileSystem does not implement conditional Update, so emulate compare-and-swap under
+        // the write lock — held across the read-then-write so the check is atomic (see module docs).
         let _guard = self.write_lock.lock().await;
-
-        // LocalFileSystem does not implement PutMode::Update, so emulate compare-and-swap under the
-        // write lock: verify the current ETag, then fall through to an unconditional overwrite.
-        if let PutMode::Update { expected } = &options.mode {
-            match self.store.head(&path).await {
-                Ok(meta) => {
-                    let current = meta.e_tag.ok_or_else(|| StorageError::Backend {
-                        source: format!("object store returned no etag for {key}").into(),
-                    })?;
-                    if current.as_str() != expected.as_str() {
-                        return Err(StorageError::Precondition { key: key.clone() });
-                    }
-                }
-                Err(object_store::Error::NotFound { .. }) => {
-                    return Err(StorageError::Precondition { key: key.clone() });
-                }
-                Err(e) => return Err(map_err(key, e)),
-            }
-        }
-
-        let os_mode = match options.mode {
-            PutMode::Create => object_store::PutMode::Create,
-            PutMode::Overwrite | PutMode::Update { .. } => object_store::PutMode::Overwrite,
-        };
-        let result = self
-            .store
-            .put_opts(&path, data.into(), os_mode.into())
-            .await
-            .map_err(|e| map_err(key, e))?;
-        let etag = result
-            .e_tag
-            .map(Etag::new)
-            .ok_or_else(|| StorageError::Backend {
-                source: format!("object store returned no etag for {key}").into(),
-            })?;
-        Ok(PutResult { etag })
+        adapter::put_emulated(&self.store, key, data, options).await
     }
 
     async fn delete(&self, key: &ObjectKey) -> Result<()> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
+        // Serialize with `put` so the emulated compare-and-swap above stays atomic.
         let _guard = self.write_lock.lock().await;
-        match self.store.delete(&path).await {
-            Ok(()) | Err(object_store::Error::NotFound { .. }) => Ok(()),
-            Err(e) => Err(map_err(key, e)),
-        }
+        adapter::delete(&self.store, key).await
     }
 
     fn list(&self, prefix: &str) -> BoxStream<'_, Result<ObjectMeta>> {
-        // object_store's `list` is already a lazy, constant-memory stream that pages internally;
-        // map each entry onto the contract's types. The returned stream is owned ('static), so it
-        // does not borrow `prefix_path` or `self`.
-        let prefix_path = Path::from(prefix);
-        self.store
-            .list(Some(&prefix_path))
-            .map(|res| to_meta(&res.map_err(backend)?))
-            .boxed()
+        adapter::list(&self.store, prefix)
     }
 }
 
