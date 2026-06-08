@@ -32,6 +32,10 @@ pub use engine::{Collection, Loami};
 pub use error::{Error, Result};
 pub use registry::Registry;
 
+/// Re-exported from `loami-storage`: the storage error wrapped by [`Error::Storage`]. Re-exported so
+/// a consumer can match on it through `loami` alone, without a direct dependency on `loami-storage`.
+pub use loami_storage::StorageError;
+
 /// Returns the version of the `loami` crate, as reported by Cargo at build time.
 ///
 /// # Examples

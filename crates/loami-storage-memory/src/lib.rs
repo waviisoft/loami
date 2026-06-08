@@ -16,8 +16,8 @@ use bytes::Bytes;
 use futures::stream::{self, BoxStream};
 use futures::StreamExt;
 use loami_storage::{
-    Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult, Result, StorageError,
-    StorageProvider,
+    key_matches_prefix, Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult,
+    Result, StorageError, StorageProvider,
 };
 
 /// An in-memory object store.
@@ -145,23 +145,13 @@ impl StorageProvider for MemoryProvider {
             let objects = self.objects.lock().expect("lock poisoned");
             objects
                 .iter()
-                .filter(|(key, _)| key_has_prefix(key.as_str(), prefix))
+                .filter(|(key, _)| key_matches_prefix(key.as_str(), prefix))
                 .map(|(key, entry)| object_meta(key, entry))
                 .collect()
         };
         metas.sort_by(|a, b| a.key.as_str().cmp(b.key.as_str()));
         stream::iter(metas.into_iter().map(Ok::<_, StorageError>)).boxed()
     }
-}
-
-/// Path-segment prefix match (directory-style): an empty prefix matches everything, a trailing `/`
-/// is ignored, and a non-empty prefix matches only keys strictly beneath it on a `/` boundary.
-fn key_has_prefix(key: &str, prefix: &str) -> bool {
-    if prefix.is_empty() {
-        return true;
-    }
-    let prefix = prefix.strip_suffix('/').unwrap_or(prefix);
-    key.len() > prefix.len() && key.starts_with(prefix) && key.as_bytes()[prefix.len()] == b'/'
 }
 
 #[cfg(test)]
