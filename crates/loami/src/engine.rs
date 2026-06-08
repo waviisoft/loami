@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use bytes::Bytes;
 use futures::TryStreamExt;
-use loami_storage::{ObjectKey, PutOptions, StorageError, StorageProvider};
+use loami_storage::{validate_segment, ObjectKey, PutOptions, StorageError, StorageProvider};
 use serde_json::Value;
 
 use crate::{DocId, Document, Error, Registry, Result};
@@ -70,8 +70,8 @@ impl Loami {
     ///
     /// # Errors
     ///
-    /// Returns [`Error::InvalidName`] if `name` is empty or contains characters outside
-    /// `[A-Za-z0-9._-]`.
+    /// Returns [`Error::InvalidName`] unless `name` is a single valid path segment: non-empty,
+    /// neither `.` nor `..`, and containing only `[A-Za-z0-9._-]`.
     pub fn collection(&self, name: &str) -> Result<Collection> {
         validate_name(name)?;
         Ok(Collection {
@@ -175,25 +175,13 @@ impl Collection {
     }
 }
 
-/// A collection name must be a single, non-empty object-key segment.
+/// A collection name must be a single valid object-key segment, so a document's key
+/// (`"<collection>/<id>"`) is always well-formed.
 fn validate_name(name: &str) -> Result<()> {
-    let invalid = |reason| Error::InvalidName {
+    validate_segment(name).map_err(|reason| Error::InvalidName {
         name: name.to_owned(),
         reason,
-    };
-    if name.is_empty() {
-        return Err(invalid("collection name must not be empty"));
-    }
-    if name == "." || name == ".." {
-        return Err(invalid("collection name must not be '.' or '..'"));
-    }
-    if !name
-        .bytes()
-        .all(|b| b.is_ascii_alphanumeric() || matches!(b, b'.' | b'_' | b'-'))
-    {
-        return Err(invalid("collection name may contain only [A-Za-z0-9._-]"));
-    }
-    Ok(())
+    })
 }
 
 /// Returns whether `value` matches `filter`. An object filter matches when, for every field it
