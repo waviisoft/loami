@@ -35,12 +35,10 @@
 
 use bytes::Bytes;
 use futures::stream::BoxStream;
-use futures::StreamExt;
 use loami_storage::{
-    Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult, Result, StorageError,
-    StorageProvider,
+    GetResult, ObjectKey, ObjectMeta, PutOptions, PutResult, Result, StorageProvider,
 };
-use object_store::{path::Path, ObjectStore, ObjectStoreExt};
+use loami_storage_object_store as adapter;
 
 /// `object_store`'s Azure builder, re-exported so callers configure auth and endpoints through its
 /// standard, well-documented surface without depending on `object_store` directly.
@@ -58,7 +56,8 @@ impl AzureProvider {
     ///
     /// # Errors
     ///
-    /// Returns a [`StorageError::Backend`] if the environment does not yield a usable configuration.
+    /// Returns a [`StorageError::Backend`](loami_storage::StorageError::Backend) if the environment
+    /// does not yield a usable configuration.
     pub fn from_env(container: impl Into<String>) -> Result<Self> {
         Self::from_builder(MicrosoftAzureBuilder::from_env().with_container_name(container))
     }
@@ -68,145 +67,41 @@ impl AzureProvider {
     ///
     /// # Errors
     ///
-    /// Returns a [`StorageError::Backend`] if the builder cannot produce a store.
+    /// Returns a [`StorageError::Backend`](loami_storage::StorageError::Backend) if the builder
+    /// cannot produce a store.
     pub fn from_builder(builder: MicrosoftAzureBuilder) -> Result<Self> {
         Ok(Self {
-            store: builder.build().map_err(backend)?,
+            store: builder.build().map_err(adapter::backend_error)?,
         })
     }
-}
-
-/// Wraps an arbitrary object-store error as a backend error.
-fn backend(err: object_store::Error) -> StorageError {
-    StorageError::Backend {
-        source: Box::new(err),
-    }
-}
-
-/// Maps an object-store error to the contract's error type, preserving the conditional-write and
-/// not-found cases that the conformance suite checks for.
-fn map_err(key: &ObjectKey, err: object_store::Error) -> StorageError {
-    match err {
-        object_store::Error::NotFound { .. } => StorageError::NotFound { key: key.clone() },
-        object_store::Error::AlreadyExists { .. } => {
-            StorageError::AlreadyExists { key: key.clone() }
-        }
-        object_store::Error::Precondition { .. } => StorageError::Precondition { key: key.clone() },
-        other => backend(other),
-    }
-}
-
-/// Converts an object-store [`object_store::ObjectMeta`] to the contract's [`ObjectMeta`].
-fn to_meta(meta: &object_store::ObjectMeta) -> Result<ObjectMeta> {
-    let etag = meta
-        .e_tag
-        .clone()
-        .map(Etag::new)
-        .ok_or_else(|| StorageError::Backend {
-            source: format!("object store returned no etag for {}", meta.location).into(),
-        })?;
-    Ok(ObjectMeta {
-        key: ObjectKey::new(meta.location.to_string()),
-        size: meta.size,
-        etag,
-        last_modified: Some(meta.last_modified.into()),
-    })
 }
 
 #[async_trait::async_trait]
 impl StorageProvider for AzureProvider {
     async fn get(&self, key: &ObjectKey) -> Result<GetResult> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
-        let result = self.store.get(&path).await.map_err(|e| map_err(key, e))?;
-        let meta = to_meta(&result.meta)?;
-        let data = result.bytes().await.map_err(|e| map_err(key, e))?;
-        Ok(GetResult { data, meta })
+        adapter::get(&self.store, key).await
     }
 
     async fn get_range(&self, key: &ObjectKey, range: std::ops::Range<u64>) -> Result<GetResult> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
-        // Validate bounds against the object's size first; object_store does not guarantee a uniform
-        // error for an out-of-bounds range. The head also supplies the result's metadata.
-        let head = self.store.head(&path).await.map_err(|e| map_err(key, e))?;
-        let size = head.size;
-        if range.start > range.end || range.end > size {
-            return Err(StorageError::InvalidRange {
-                key: key.clone(),
-                start: range.start,
-                end: range.end,
-                size,
-            });
-        }
-        if range.start == range.end {
-            // object_store rejects a zero-length range; the contract returns empty bytes.
-            return Ok(GetResult {
-                data: Bytes::new(),
-                meta: to_meta(&head)?,
-            });
-        }
-        let data = self
-            .store
-            .get_range(&path, range)
-            .await
-            .map_err(|e| map_err(key, e))?;
-        Ok(GetResult {
-            data,
-            meta: to_meta(&head)?,
-        })
+        adapter::get_range(&self.store, key, range).await
     }
 
     async fn head(&self, key: &ObjectKey) -> Result<ObjectMeta> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
-        let meta = self.store.head(&path).await.map_err(|e| map_err(key, e))?;
-        to_meta(&meta)
+        adapter::head(&self.store, key).await
     }
 
     async fn put(&self, key: &ObjectKey, data: Bytes, options: PutOptions) -> Result<PutResult> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
-        // Azure Blob implements all three modes natively, including conditional Update (CAS).
-        let mode = match options.mode {
-            PutMode::Overwrite => object_store::PutMode::Overwrite,
-            PutMode::Create => object_store::PutMode::Create,
-            PutMode::Update { expected } => {
-                object_store::PutMode::Update(object_store::UpdateVersion {
-                    e_tag: Some(expected.as_str().to_owned()),
-                    version: None,
-                })
-            }
-        };
-        let result = self
-            .store
-            .put_opts(&path, data.into(), mode.into())
-            .await
-            .map_err(|e| map_err(key, e))?;
-        let etag = result
-            .e_tag
-            .map(Etag::new)
-            .ok_or_else(|| StorageError::Backend {
-                source: format!("object store returned no etag for {key}").into(),
-            })?;
-        Ok(PutResult { etag })
+        // Azure Blob implements all three modes natively, including conditional Update (CAS), so no
+        // emulation or locking is needed.
+        adapter::put_native(&self.store, key, data, options).await
     }
 
     async fn delete(&self, key: &ObjectKey) -> Result<()> {
-        key.validate()?;
-        let path = Path::from(key.as_str());
-        match self.store.delete(&path).await {
-            Ok(()) | Err(object_store::Error::NotFound { .. }) => Ok(()),
-            Err(e) => Err(map_err(key, e)),
-        }
+        adapter::delete(&self.store, key).await
     }
 
     fn list(&self, prefix: &str) -> BoxStream<'_, Result<ObjectMeta>> {
-        let prefix_path = Path::from(prefix);
-        self.store
-            .list(Some(&prefix_path))
-            .map(|res| to_meta(&res.map_err(backend)?))
-            .boxed()
+        adapter::list(&self.store, prefix)
     }
 }
 

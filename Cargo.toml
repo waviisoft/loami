@@ -4,6 +4,7 @@ members = [
     "crates/loami",
     "crates/loami-storage",
     "crates/loami-storage-memory",
+    "crates/loami-storage-object-store",
     "crates/loami-storage-fs",
     "crates/loami-storage-azure",
 ]
