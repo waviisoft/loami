@@ -35,7 +35,7 @@ The backend is chosen by the `LOAMI_URL` environment variable; nothing else chan
 
 A cloud backend like Azure isn't only for production: point `LOAMI_URL` at it from your own machine
 to validate that the cloud setup is correct, or to reproduce an issue against real storage. The code
-never changes — that's the point.
+never changes.
 
 The engine only knows `mem://`. The example registers `file://` (and, behind the `azure` feature,
 `azure://`) in its
