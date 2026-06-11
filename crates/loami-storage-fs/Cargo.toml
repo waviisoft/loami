@@ -1,6 +1,6 @@
 [package]
 name = "loami-storage-fs"
-version = "0.0.1"
+version = "0.1.0"
 description = "Local-filesystem StorageProvider for Loami (file://), built on object_store."
 rust-version = "1.80"
 edition.workspace = true

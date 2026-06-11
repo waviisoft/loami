@@ -1,6 +1,6 @@
 [package]
 name = "loami-example-tasks"
-version = "0.0.1"
+version = "0.1.0"
 description = "Getting-started example for Loami: a tasks CRUD store over schemaless JSON documents."
 publish = false
 rust-version = "1.80"

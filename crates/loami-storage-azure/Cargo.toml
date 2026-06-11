@@ -1,6 +1,6 @@
 [package]
 name = "loami-storage-azure"
-version = "0.0.1"
+version = "0.1.0"
 description = "Azure Blob Storage StorageProvider for Loami (azure://), built on object_store."
 rust-version = "1.80"
 edition.workspace = true

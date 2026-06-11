@@ -678,7 +678,7 @@ checksum = "92daf443525c4cce67b150400bc2316076100ce0b3686209eb8cf3c31612e6f0"
 
 [[package]]
 name = "loami"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -693,7 +693,7 @@ dependencies = [
 
 [[package]]
 name = "loami-example-tasks"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "loami",
  "loami-storage",
@@ -706,7 +706,7 @@ dependencies = [
 
 [[package]]
 name = "loami-storage"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -716,7 +716,7 @@ dependencies = [
 
 [[package]]
 name = "loami-storage-azure"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -729,7 +729,7 @@ dependencies = [
 
 [[package]]
 name = "loami-storage-fs"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -743,7 +743,7 @@ dependencies = [
 
 [[package]]
 name = "loami-storage-memory"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "async-trait",
  "bytes",
@@ -754,7 +754,7 @@ dependencies = [
 
 [[package]]
 name = "loami-storage-object-store"
-version = "0.0.1"
+version = "0.1.0"
 dependencies = [
  "bytes",
  "futures",

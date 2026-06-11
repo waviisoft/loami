@@ -1,6 +1,6 @@
 [package]
 name = "loami-storage"
-version = "0.0.1"
+version = "0.1.0"
 description = "Storage provider contract for Loami: the StorageProvider trait, shared types, and a conformance test kit."
 rust-version = "1.80"
 edition.workspace = true

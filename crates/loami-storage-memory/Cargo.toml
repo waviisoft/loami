@@ -1,6 +1,6 @@
 [package]
 name = "loami-storage-memory"
-version = "0.0.1"
+version = "0.1.0"
 description = "In-memory StorageProvider for Loami — a zero-dependency reference implementation for tests and mem://."
 rust-version = "1.80"
 edition.workspace = true
