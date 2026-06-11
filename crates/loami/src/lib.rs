@@ -36,6 +36,11 @@ pub use registry::Registry;
 /// a consumer can match on it through `loami` alone, without a direct dependency on `loami-storage`.
 pub use loami_storage::StorageError;
 
+/// The built-in in-memory connection string — the engine's zero-setup default backend, registered by
+/// [`Registry::default`]. Exposed so callers can reference the default without re-spelling the
+/// literal `"mem://"`.
+pub const MEM_URL: &str = "mem://";
+
 /// Returns the version of the `loami` crate, as reported by Cargo at build time.
 ///
 /// # Examples
