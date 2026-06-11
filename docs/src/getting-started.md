@@ -27,11 +27,15 @@ tasks.delete(&buy).await?;
 
 The backend is chosen by the `LOAMI_URL` environment variable; nothing else changes:
 
-| Context | `LOAMI_URL` | Notes |
+| Backend | `LOAMI_URL` | Notes |
 | --- | --- | --- |
-| **CI / tests** | `mem://` | default; in-memory, zero setup, ephemeral |
-| **Local dev** | `file://./loami-data` | persists on disk between runs, inspectable |
-| **Production** | `azure://<container>` | Azure Blob; standard `AZURE_STORAGE_*` auth (needs the `azure` feature) |
+| **In-memory** | `mem://` | default; zero setup, ephemeral — ideal for CI and tests |
+| **Local file** | `file://./loami-data` | persists on disk between runs, inspectable |
+| **Cloud** | `azure://<container>` | Azure Blob; standard `AZURE_STORAGE_*` auth (needs the `azure` feature) |
+
+A cloud backend like Azure isn't only for production: point `LOAMI_URL` at it from your own machine
+to validate that the cloud setup is correct, or to reproduce an issue against real storage. The code
+never changes — that's the point.
 
 The engine only knows `mem://`. The example registers `file://` (and, behind the `azure` feature,
 `azure://`) in its
@@ -55,8 +59,12 @@ LOAMI_URL=azure://my-container cargo run -p loami-example-tasks --features azure
 Run the `file://` command twice and the second run reports the tasks the first one left behind — the
 same code, now durable.
 
-## What proves it keeps working
+## Testing your own code
 
-The example's smoke tests run the full walkthrough on `mem://` and `file://` on every build, and one
-test writes through a `file://` connection and reads it back through a fresh one — so the
-dev/prod-parity guarantee (same code, swap the URL) is verified continuously, with zero services.
+Because the same code runs on every backend, you can test against the fast in-memory backend and
+trust it reflects how your code behaves on a real one. The example ships
+[smoke tests](https://github.com/waviisoft/loami/blob/main/examples/tasks/tests/smoke.rs) that do
+exactly this: they run the full walkthrough on `mem://`, then again on `file://`, and one test writes
+through a `file://` connection and reads the data back through a fresh one to confirm it persisted.
+They need no running services, so they fit naturally into your own test suite — a pattern worth
+copying for your collections.

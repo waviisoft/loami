@@ -1,5 +1,6 @@
 //! Smoke tests: the example runs with zero services (`mem://`) and persists on `file://`. These run
-//! in the workspace test suite on every build, continuously proving dev/prod parity.
+//! in the workspace test suite on every build, continuously proving local/cloud parity — the same
+//! code runs unchanged whichever backend the URL names.
 
 use loami::Loami;
 use loami_example_tasks::{connect, run};

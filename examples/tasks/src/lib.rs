@@ -1,8 +1,9 @@
 //! Getting-started example for Loami: a tiny tasks CRUD store over schemaless JSON documents.
 //!
 //! The same code runs against any backend — only the connection string changes. The binary reads it
-//! from `LOAMI_URL` (default [`DEFAULT_URL`]); the guide's getting-started page walks through running
-//! it on `mem://` (CI), `file://` (local dev), and `azure://` (production).
+//! from `LOAMI_URL` (default [`loami::MEM_URL`]); the guide's getting-started page walks through
+//! running it on `mem://` (CI), `file://` (local), and — with the `azure` feature — `azure://`
+//! (cloud, which is equally usable locally to validate or reproduce a cloud setup).
 
 use std::sync::Arc;
 
@@ -10,9 +11,6 @@ use loami::{Loami, Registry, Result, StorageError};
 use loami_storage::StorageProvider;
 use loami_storage_fs::FsProvider;
 use serde_json::json;
-
-/// The connection string used when `LOAMI_URL` is unset: in-memory, zero setup.
-pub const DEFAULT_URL: &str = "mem://";
 
 /// Builds the provider registry this example supports.
 ///
