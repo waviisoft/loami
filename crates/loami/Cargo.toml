@@ -1,6 +1,6 @@
 [package]
 name = "loami"
-version = "0.0.1"
+version = "0.1.0"
 description = "Fertile ground for your backend — an embeddable backend substrate built on compute + blob storage. Pre-alpha."
 readme = "../../README.md"
 keywords = ["database", "embedded", "document-store", "blob", "backend"]
