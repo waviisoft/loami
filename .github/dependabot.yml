@@ -6,6 +6,12 @@ updates:
       interval: weekly
     commit-message:
       prefix: "deps"
+    # Batch routine minor/patch bumps into one weekly PR (auto-merged once CI passes; see
+    # .github/workflows/dependabot-auto-merge.yml). Major bumps still arrive as their own PRs for
+    # manual review.
+    groups:
+      cargo-minor-patch:
+        update-types: ["minor", "patch"]
 
   - package-ecosystem: github-actions
     directory: "/"
@@ -13,3 +19,6 @@ updates:
       interval: weekly
     commit-message:
       prefix: "ci"
+    groups:
+      actions-minor-patch:
+        update-types: ["minor", "patch"]
