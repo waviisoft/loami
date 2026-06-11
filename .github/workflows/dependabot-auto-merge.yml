@@ -1,13 +1,17 @@
 name: dependabot-auto-merge
 
-# Auto-merge Dependabot's weekly grouped minor/patch updates once the required CI checks pass —
-# the test suite is the gate that validates functionality. Major bumps are skipped and left for
-# manual review.
+# Auto-approve and auto-merge Dependabot's weekly grouped minor/patch updates once the required CI
+# checks pass — the test suite is the gate that validates functionality. Major bumps are skipped and
+# left for manual review.
+#
+# The approval is what lets these merge unattended: `main` requires a review, and human-authored PRs
+# are reviewed and merged by a maintainer, but Dependabot's non-major updates are approved here by
+# the Actions bot instead.
 #
 # Prerequisites (repo settings, configured once outside this file):
-#   - "Allow auto-merge" enabled on the repository, and
+#   - "Allow auto-merge" enabled on the repository,
+#   - "Allow GitHub Actions to create and approve pull requests" enabled, and
 #   - branch protection on `main` with the CI jobs as required status checks.
-# Without those, GitHub auto-merge cannot be enabled and this workflow is a no-op.
 
 on: pull_request
 
@@ -25,6 +29,13 @@ jobs:
         uses: dependabot/fetch-metadata@v3
         with:
           github-token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Approve non-major updates
+        if: steps.meta.outputs.update-type != 'version-update:semver-major'
+        run: gh pr review --approve "$PR_URL"
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Enable auto-merge for non-major updates
         if: steps.meta.outputs.update-type != 'version-update:semver-major'
