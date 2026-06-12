@@ -23,19 +23,25 @@ pub fn registry() -> Registry {
     // `file://<dir>` — local-dev persistence. Create the directory on first use so the example just
     // works; an application might instead require it to exist.
     registry.register("file", |dir| {
-        std::fs::create_dir_all(dir).map_err(|err| StorageError::Backend {
-            source: Box::new(err),
-        })?;
-        let provider: Arc<dyn StorageProvider> = Arc::new(FsProvider::new(dir)?);
-        Ok(provider)
+        let dir = dir.to_owned();
+        Box::pin(async move {
+            std::fs::create_dir_all(&dir).map_err(|err| StorageError::Backend {
+                source: Box::new(err),
+            })?;
+            let provider: Arc<dyn StorageProvider> = Arc::new(FsProvider::new(&dir)?);
+            Ok(provider)
+        })
     });
 
     // `azure://<container>` — credentials come from the standard `AZURE_STORAGE_*` environment.
     #[cfg(feature = "azure")]
     registry.register("azure", |container| {
-        let provider: Arc<dyn StorageProvider> =
-            Arc::new(loami_storage_azure::AzureProvider::from_env(container)?);
-        Ok(provider)
+        let container = container.to_owned();
+        Box::pin(async move {
+            let provider: Arc<dyn StorageProvider> =
+                Arc::new(loami_storage_azure::AzureProvider::from_env(container)?);
+            Ok(provider)
+        })
     });
 
     registry
@@ -47,8 +53,8 @@ pub fn registry() -> Registry {
 /// # Errors
 ///
 /// Returns an error if the URL's scheme is not registered or the provider cannot be constructed.
-pub fn connect(url: &str) -> Result<Loami> {
-    Loami::connect_with(&registry(), url)
+pub async fn connect(url: &str) -> Result<Loami> {
+    Loami::connect_with(&registry(), url).await
 }
 
 /// Runs the tasks walkthrough against an open store, printing each step. This doubles as the

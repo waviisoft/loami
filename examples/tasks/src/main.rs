@@ -8,7 +8,7 @@ async fn main() -> Result<()> {
     let url = std::env::var("LOAMI_URL").unwrap_or_else(|_| MEM_URL.to_string());
     println!("Loami tasks example — backend: {url}");
 
-    let db = connect(&url)?;
+    let db = connect(&url).await?;
     run(&db).await?;
 
     println!("done");

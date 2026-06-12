@@ -13,7 +13,7 @@
 //!
 //! # async fn run() -> loami::Result<()> {
 //! // mem:// is the built-in default; register other providers to add their schemes.
-//! let db = Loami::connect("mem://")?;
+//! let db = Loami::connect("mem://").await?;
 //! let tasks = db.collection("tasks")?;
 //! let id = tasks.insert(json!({ "title": "ship loami", "done": false })).await?;
 //! tasks.update(&id, json!({ "title": "ship loami", "done": true })).await?;

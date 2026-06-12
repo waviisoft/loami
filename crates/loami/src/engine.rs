@@ -46,8 +46,8 @@ impl Loami {
     ///
     /// Returns [`Error::Url`] for a malformed string, [`Error::UnknownScheme`] for a scheme no
     /// registered provider handles, or a storage error if the provider cannot be constructed.
-    pub fn connect(url: &str) -> Result<Self> {
-        Self::connect_with(&Registry::default(), url)
+    pub async fn connect(url: &str) -> Result<Self> {
+        Self::connect_with(&Registry::default(), url).await
     }
 
     /// Like [`connect`](Self::connect), but resolves the scheme through `registry` — so you can
@@ -56,8 +56,8 @@ impl Loami {
     /// # Errors
     ///
     /// As [`connect`](Self::connect).
-    pub fn connect_with(registry: &Registry, url: &str) -> Result<Self> {
-        Ok(Self::open(registry.resolve(url)?))
+    pub async fn connect_with(registry: &Registry, url: &str) -> Result<Self> {
+        Ok(Self::open(registry.resolve(url).await?))
     }
 
     /// Opens a store over an existing storage provider.
@@ -357,7 +357,7 @@ mod tests {
 
     #[tokio::test]
     async fn connect_mem() {
-        let db = Loami::connect("mem://").unwrap();
+        let db = Loami::connect("mem://").await.unwrap();
         let tasks = db.collection("tasks").unwrap();
         let id = tasks.insert(json!({ "x": 1 })).await.unwrap();
         assert!(tasks.get(&id).await.unwrap().is_some());
@@ -367,18 +367,20 @@ mod tests {
     async fn connect_requires_provider_registration() {
         // The default registry knows only `mem`; any other scheme is rejected until registered.
         assert!(matches!(
-            Loami::connect("test://x"),
+            Loami::connect("test://x").await,
             Err(Error::UnknownScheme { .. })
         ));
 
         // Once the application registers a provider for the scheme, the same URL resolves and works.
         let mut registry = Registry::default();
         registry.register("test", |_rest| {
-            let provider: Arc<dyn StorageProvider> = Arc::new(TestProvider::default());
-            Ok(provider)
+            Box::pin(async {
+                let provider: Arc<dyn StorageProvider> = Arc::new(TestProvider::default());
+                Ok(provider)
+            })
         });
 
-        let db = Loami::connect_with(&registry, "test://x").unwrap();
+        let db = Loami::connect_with(&registry, "test://x").await.unwrap();
         let id = db
             .collection("tasks")
             .unwrap()
@@ -394,23 +396,26 @@ mod tests {
             .is_some());
     }
 
-    #[test]
-    fn connect_rejects_bad_urls() {
-        assert!(Loami::connect("nope").is_err()); // no scheme separator
-        assert!(Loami::connect("ftp://x").is_err()); // unregistered scheme
+    #[tokio::test]
+    async fn connect_rejects_bad_urls() {
+        assert!(Loami::connect("nope").await.is_err()); // no scheme separator
+        assert!(Loami::connect("ftp://x").await.is_err()); // unregistered scheme
     }
 
-    #[test]
-    fn unknown_scheme_reports_registered() {
+    #[tokio::test]
+    async fn unknown_scheme_reports_registered() {
         // A registry with only a custom scheme — the built-ins are absent.
         let mut registry = Registry::empty();
         registry.register("test", |_rest| {
-            let provider: Arc<dyn StorageProvider> = Arc::new(TestProvider::default());
-            Ok(provider)
+            Box::pin(async {
+                let provider: Arc<dyn StorageProvider> = Arc::new(TestProvider::default());
+                Ok(provider)
+            })
         });
 
         // An unregistered scheme reports what is registered.
         let err = Loami::connect_with(&registry, "mem://")
+            .await
             .err()
             .expect("mem:// is not registered in this registry");
         match err {
