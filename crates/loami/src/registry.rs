@@ -7,12 +7,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use futures::future::BoxFuture;
 use loami_storage::StorageProvider;
 
 use crate::{Error, Result};
 
-/// Builds a provider from the part of a connection string after `scheme://`.
-type Factory = Arc<dyn Fn(&str) -> Result<Arc<dyn StorageProvider>> + Send + Sync>;
+/// Builds a provider from the part of a connection string after `scheme://`. Construction is async so
+/// a provider that must do I/O to come up (open a connection, fetch a token) can; one that builds
+/// synchronously simply returns a ready future.
+type Factory =
+    Arc<dyn Fn(&str) -> BoxFuture<'static, Result<Arc<dyn StorageProvider>>> + Send + Sync>;
 
 /// Maps connection-string schemes (e.g. `mem`) to provider constructors.
 ///
@@ -35,11 +39,15 @@ impl Registry {
     }
 
     /// Registers `factory` for `scheme` (the part before `://`), replacing any prior registration.
-    /// The factory receives the part of the URL after `scheme://`.
+    /// The factory receives the part of the URL after `scheme://` and returns a future that builds
+    /// the provider.
     pub fn register(
         &mut self,
         scheme: impl Into<String>,
-        factory: impl Fn(&str) -> Result<Arc<dyn StorageProvider>> + Send + Sync + 'static,
+        factory: impl Fn(&str) -> BoxFuture<'static, Result<Arc<dyn StorageProvider>>>
+            + Send
+            + Sync
+            + 'static,
     ) -> &mut Self {
         self.factories.insert(scheme.into(), Arc::new(factory));
         self
@@ -54,13 +62,13 @@ impl Registry {
     }
 
     /// Resolves `url` to a provider via its scheme.
-    pub(crate) fn resolve(&self, url: &str) -> Result<Arc<dyn StorageProvider>> {
+    pub(crate) async fn resolve(&self, url: &str) -> Result<Arc<dyn StorageProvider>> {
         let (scheme, rest) = url.split_once("://").ok_or_else(|| Error::Url {
             url: url.to_owned(),
             reason: "expected a connection string like \"scheme://...\"",
         })?;
         match self.factories.get(scheme) {
-            Some(factory) => factory(rest),
+            Some(factory) => factory(rest).await,
             None => Err(Error::UnknownScheme {
                 url: url.to_owned(),
                 scheme: scheme.to_owned(),
@@ -77,9 +85,11 @@ impl Default for Registry {
     fn default() -> Self {
         let mut registry = Self::empty();
         registry.register("mem", |_rest| {
-            let provider: Arc<dyn StorageProvider> =
-                Arc::new(loami_storage_memory::MemoryProvider::new());
-            Ok(provider)
+            Box::pin(async {
+                let provider: Arc<dyn StorageProvider> =
+                    Arc::new(loami_storage_memory::MemoryProvider::new());
+                Ok(provider)
+            })
         });
         registry
     }

@@ -7,7 +7,7 @@ provider, then insert, get, update, find, and delete documents:
 use loami::Loami;
 use serde_json::json;
 
-let db = Loami::connect("mem://")?;
+let db = Loami::connect("mem://").await?;
 let tasks = db.collection("tasks")?;
 
 let id = tasks.insert(json!({ "title": "buy milk", "done": false })).await?; // -> DocId
@@ -29,12 +29,15 @@ use loami_storage_fs::FsProvider;
 use std::sync::Arc;
 
 // mem:// works out of the box (CI, tests).
-let db = Loami::connect("mem://")?;
+let db = Loami::connect("mem://").await?;
 
 // Register a provider to add its scheme, then switch environments by URL alone.
 let mut registry = Registry::default();
-registry.register("file", |path| Ok(Arc::new(FsProvider::new(path)?)));
-let db = Loami::connect_with(&registry, "file://./data")?;   // local dev — persists on disk
+registry.register("file", |path| {
+    let path = path.to_owned();
+    Box::pin(async move { Ok(Arc::new(FsProvider::new(&path)?) as _) })
+});
+let db = Loami::connect_with(&registry, "file://./data").await?;   // local dev — persists on disk
 ```
 
 Any [storage provider](./storage.md) registers the same way — add its crate and register its scheme.
