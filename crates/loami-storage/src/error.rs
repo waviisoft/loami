@@ -59,6 +59,18 @@ pub enum StorageError {
         reason: &'static str,
     },
 
+    /// A write would exceed a capacity limit configured on the provider (e.g. an in-memory
+    /// provider's `max_bytes`).
+    #[error(
+        "storage quota exceeded: this write would use {attempted} bytes, over the {limit}-byte limit"
+    )]
+    QuotaExceeded {
+        /// The configured byte limit.
+        limit: usize,
+        /// The total bytes the store would hold after the write.
+        attempted: usize,
+    },
+
     /// An error originating from the underlying backend.
     #[error("storage backend error: {source}")]
     Backend {
