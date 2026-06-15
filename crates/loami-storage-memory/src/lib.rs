@@ -16,8 +16,8 @@ use bytes::Bytes;
 use futures::stream::{self, BoxStream};
 use futures::StreamExt;
 use loami_storage::{
-    key_matches_prefix, Etag, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions, PutResult,
-    Result, StorageError, StorageProvider,
+    key_matches_prefix, Etag, FromUrl, GetResult, ObjectKey, ObjectMeta, PutMode, PutOptions,
+    PutResult, Result, StorageError, StorageProvider,
 };
 
 /// An in-memory object store.
@@ -151,6 +151,16 @@ impl StorageProvider for MemoryProvider {
         };
         metas.sort_by(|a, b| a.key.as_str().cmp(b.key.as_str()));
         stream::iter(metas.into_iter().map(Ok::<_, StorageError>)).boxed()
+    }
+}
+
+#[async_trait::async_trait]
+impl FromUrl for MemoryProvider {
+    const SCHEME: &'static str = "mem";
+
+    /// The in-memory store ignores the URL tail today; a fresh, empty store per connect.
+    async fn from_url(_rest: &str) -> Result<Self> {
+        Ok(Self::new())
     }
 }
 

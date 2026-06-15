@@ -36,7 +36,7 @@
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use loami_storage::{
-    GetResult, ObjectKey, ObjectMeta, PutOptions, PutResult, Result, StorageProvider,
+    FromUrl, GetResult, ObjectKey, ObjectMeta, PutOptions, PutResult, Result, StorageProvider,
 };
 use loami_storage_object_store as adapter;
 
@@ -102,6 +102,16 @@ impl StorageProvider for AzureProvider {
 
     fn list(&self, prefix: &str) -> BoxStream<'_, Result<ObjectMeta>> {
         adapter::list(&self.store, prefix)
+    }
+}
+
+#[async_trait::async_trait]
+impl FromUrl for AzureProvider {
+    const SCHEME: &'static str = "azure";
+
+    /// `azure://<container>`; credentials come from the standard `AZURE_STORAGE_*` environment.
+    async fn from_url(rest: &str) -> Result<Self> {
+        Self::from_env(rest)
     }
 }
 

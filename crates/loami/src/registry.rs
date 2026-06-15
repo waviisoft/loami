@@ -8,7 +8,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use futures::future::BoxFuture;
-use loami_storage::StorageProvider;
+use loami_storage::{FromUrl, StorageProvider};
 
 use crate::{Error, Result};
 
@@ -53,6 +53,22 @@ impl Registry {
         self
     }
 
+    /// Registers provider `P` under its [`FromUrl::SCHEME`], building it from the URL tail via
+    /// [`FromUrl::from_url`] on each connect.
+    ///
+    /// A one-line alternative to [`register`](Self::register) for any provider that implements
+    /// [`FromUrl`] — the provider owns its scheme and how it parses the tail. Replaces a prior
+    /// registration of the same scheme.
+    pub fn add<P: FromUrl + 'static>(&mut self) -> &mut Self {
+        self.register(P::SCHEME, |rest| {
+            let rest = rest.to_owned();
+            Box::pin(async move {
+                let provider: Arc<dyn StorageProvider> = Arc::new(P::from_url(&rest).await?);
+                Ok(provider)
+            })
+        })
+    }
+
     /// The registered schemes, sorted — useful for diagnostics.
     #[must_use]
     pub fn schemes(&self) -> Vec<&str> {
@@ -84,13 +100,7 @@ impl Default for Registry {
     /// before connecting.
     fn default() -> Self {
         let mut registry = Self::empty();
-        registry.register("mem", |_rest| {
-            Box::pin(async {
-                let provider: Arc<dyn StorageProvider> =
-                    Arc::new(loami_storage_memory::MemoryProvider::new());
-                Ok(provider)
-            })
-        });
+        registry.add::<loami_storage_memory::MemoryProvider>();
         registry
     }
 }

@@ -396,6 +396,37 @@ mod tests {
             .is_some());
     }
 
+    // `add::<P>()` registers a provider that implements `FromUrl` by type, using its `SCHEME`.
+    #[async_trait::async_trait]
+    impl loami_storage::FromUrl for TestProvider {
+        const SCHEME: &'static str = "test";
+        async fn from_url(_rest: &str) -> std::result::Result<Self, loami_storage::StorageError> {
+            Ok(Self::default())
+        }
+    }
+
+    #[tokio::test]
+    async fn add_registers_provider_by_type() {
+        let mut registry = Registry::empty();
+        registry.add::<TestProvider>(); // scheme comes from FromUrl::SCHEME — no closure
+        assert_eq!(registry.schemes(), ["test"]);
+
+        let db = Loami::connect_with(&registry, "test://x").await.unwrap();
+        let id = db
+            .collection("tasks")
+            .unwrap()
+            .insert(json!({ "x": 1 }))
+            .await
+            .unwrap();
+        assert!(db
+            .collection("tasks")
+            .unwrap()
+            .get(&id)
+            .await
+            .unwrap()
+            .is_some());
+    }
+
     #[tokio::test]
     async fn connect_rejects_bad_urls() {
         assert!(Loami::connect("nope").await.is_err()); // no scheme separator

@@ -19,7 +19,6 @@ azure = ["dep:loami-storage-azure"]
 
 [dependencies]
 loami = { path = "../../crates/loami" }
-loami-storage = { path = "../../crates/loami-storage" }
 loami-storage-fs = { path = "../../crates/loami-storage-fs" }
 loami-storage-azure = { path = "../../crates/loami-storage-azure", optional = true }
 serde_json = "1"

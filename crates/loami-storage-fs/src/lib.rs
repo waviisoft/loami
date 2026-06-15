@@ -21,7 +21,8 @@
 use bytes::Bytes;
 use futures::stream::BoxStream;
 use loami_storage::{
-    GetResult, ObjectKey, ObjectMeta, PutOptions, PutResult, Result, StorageProvider,
+    FromUrl, GetResult, ObjectKey, ObjectMeta, PutOptions, PutResult, Result, StorageError,
+    StorageProvider,
 };
 use loami_storage_object_store as adapter;
 
@@ -38,8 +39,7 @@ impl FsProvider {
     ///
     /// # Errors
     ///
-    /// Returns a [`StorageError::Backend`](loami_storage::StorageError::Backend) if the root cannot
-    /// be opened.
+    /// Returns a [`StorageError::Backend`] if the root cannot be opened.
     pub fn new(root: impl AsRef<std::path::Path>) -> Result<Self> {
         let store = object_store::local::LocalFileSystem::new_with_prefix(root)
             .map_err(adapter::backend_error)?;
@@ -81,6 +81,20 @@ impl StorageProvider for FsProvider {
 
     fn list(&self, prefix: &str) -> BoxStream<'_, Result<ObjectMeta>> {
         adapter::list(&self.store, prefix)
+    }
+}
+
+#[async_trait::async_trait]
+impl FromUrl for FsProvider {
+    const SCHEME: &'static str = "file";
+
+    /// `file://<dir>`. Creates the root directory on first use (mkdir -p) so the connection string
+    /// just works; the parsed tail is the directory path.
+    async fn from_url(rest: &str) -> Result<Self> {
+        std::fs::create_dir_all(rest).map_err(|err| StorageError::Backend {
+            source: Box::new(err),
+        })?;
+        Self::new(rest)
     }
 }
 

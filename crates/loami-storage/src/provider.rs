@@ -76,3 +76,24 @@ pub trait StorageProvider: Send + Sync {
         self.list(prefix).try_collect().await
     }
 }
+
+/// A [`StorageProvider`] that can be constructed from its connection-string scheme and the part of
+/// the URL after `scheme://`.
+///
+/// Implementing it lets an application register the provider by type —
+/// `registry.add::<MyProvider>()` — instead of writing a factory closure: the provider owns its
+/// scheme name and how it parses the URL tail (a path, a container name, query options).
+#[async_trait::async_trait]
+pub trait FromUrl: StorageProvider + Sized {
+    /// The connection-string scheme this provider answers to (the part before `://`), e.g. `"file"`
+    /// or `"azure"`.
+    const SCHEME: &'static str;
+
+    /// Builds the provider from `rest` — everything after `scheme://` in the connection string.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`StorageError`](crate::StorageError) if the provider cannot be constructed from
+    /// `rest` (a bad path, missing credentials, an unparseable option).
+    async fn from_url(rest: &str) -> Result<Self>;
+}

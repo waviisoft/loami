@@ -5,45 +5,21 @@
 //! running it on `mem://` (CI), `file://` (local), and — with the `azure` feature — `azure://`
 //! (cloud, which is equally usable locally to validate or reproduce a cloud setup).
 
-use std::sync::Arc;
-
-use loami::{Loami, Registry, Result, StorageError};
-use loami_storage::StorageProvider;
+use loami::{Loami, Registry, Result};
 use loami_storage_fs::FsProvider;
 use serde_json::json;
 
 /// Builds the provider registry this example supports.
 ///
-/// The engine only knows `mem://`; an application registers the backends it ships. Here that is the
-/// filesystem (`file://<dir>`) and — with the `azure` feature — Azure Blob (`azure://<container>`).
+/// The engine knows only `mem://`; an application registers, by type, the backends it ships. Here
+/// that is the filesystem (`file://<dir>`) and — with the `azure` feature — Azure Blob
+/// (`azure://<container>`). Each provider owns its scheme and how it builds from the URL tail.
 #[must_use]
 pub fn registry() -> Registry {
     let mut registry = Registry::default(); // mem:// is built in.
-
-    // `file://<dir>` — local-dev persistence. Create the directory on first use so the example just
-    // works; an application might instead require it to exist.
-    registry.register("file", |dir| {
-        let dir = dir.to_owned();
-        Box::pin(async move {
-            std::fs::create_dir_all(&dir).map_err(|err| StorageError::Backend {
-                source: Box::new(err),
-            })?;
-            let provider: Arc<dyn StorageProvider> = Arc::new(FsProvider::new(&dir)?);
-            Ok(provider)
-        })
-    });
-
-    // `azure://<container>` — credentials come from the standard `AZURE_STORAGE_*` environment.
+    registry.add::<FsProvider>();
     #[cfg(feature = "azure")]
-    registry.register("azure", |container| {
-        let container = container.to_owned();
-        Box::pin(async move {
-            let provider: Arc<dyn StorageProvider> =
-                Arc::new(loami_storage_azure::AzureProvider::from_env(container)?);
-            Ok(provider)
-        })
-    });
-
+    registry.add::<loami_storage_azure::AzureProvider>();
     registry
 }
 

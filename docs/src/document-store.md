@@ -26,22 +26,21 @@ agnostic about every other backend, which the application registers:
 ```rust
 use loami::{Loami, Registry};
 use loami_storage_fs::FsProvider;
-use std::sync::Arc;
 
 // mem:// works out of the box (CI, tests).
 let db = Loami::connect("mem://").await?;
 
-// Register a provider to add its scheme, then switch environments by URL alone.
+// Register a provider by type to add its scheme, then switch environments by URL alone.
 let mut registry = Registry::default();
-registry.register("file", |path| {
-    let path = path.to_owned();
-    Box::pin(async move { Ok(Arc::new(FsProvider::new(&path)?) as _) })
-});
+registry.add::<FsProvider>();
 let db = Loami::connect_with(&registry, "file://./data").await?;   // local dev — persists on disk
 ```
 
-Any [storage provider](./storage.md) registers the same way — add its crate and register its scheme.
-For a backend you'd rather build directly, call `Loami::open(provider)`.
+Any [storage provider](./storage.md) registers the same way — add its crate and `registry.add::<It>()`.
+A provider opts in by implementing [`FromUrl`], which owns its scheme and how it parses the URL tail;
+for a backend you'd rather build directly, call `Loami::open(provider)`.
+
+[`FromUrl`]: https://docs.rs/loami/latest/loami/trait.FromUrl.html
 
 ## Model
 
