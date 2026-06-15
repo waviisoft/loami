@@ -20,12 +20,17 @@ an independent backend.
 
 ## Configuration & usage
 
-No configuration — it is empty on creation:
+Empty on creation, and optionally capped at a maximum number of stored value bytes — useful to bound
+an in-memory store used by one part of an application while another stays unbounded. A write that
+would push the total over the cap fails with `StorageError::QuotaExceeded`.
 
 ```rust
 use loami_storage_memory::MemoryProvider;
 
-let store = MemoryProvider::new();
+let store = MemoryProvider::new();                      // unbounded
+let bounded = MemoryProvider::with_max_bytes(64 << 20); // capped at 64 MiB
 ```
 
-After construction it is used like any provider — see [Using a provider](../storage.md#using-a-provider).
+Via a connection string the cap rides in the URL as a query option, so it is configuration rather
+than code — `mem://` is unbounded, `mem://?max_bytes=67108864` caps the store at 64 MiB. After
+construction it is used like any provider — see [Using a provider](../storage.md#using-a-provider).
