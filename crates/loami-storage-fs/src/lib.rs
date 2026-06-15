@@ -39,8 +39,7 @@ impl FsProvider {
     ///
     /// # Errors
     ///
-    /// Returns a [`StorageError::Backend`](loami_storage::StorageError::Backend) if the root cannot
-    /// be opened.
+    /// Returns a [`StorageError::Backend`] if the root cannot be opened.
     pub fn new(root: impl AsRef<std::path::Path>) -> Result<Self> {
         let store = object_store::local::LocalFileSystem::new_with_prefix(root)
             .map_err(adapter::backend_error)?;
