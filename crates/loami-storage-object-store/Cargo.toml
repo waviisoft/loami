@@ -16,4 +16,4 @@ workspace = true
 loami-storage = { path = "../loami-storage" }
 bytes = "1"
 futures = "0.3"
-object_store = "0.13"
+object_store = "0.14"
