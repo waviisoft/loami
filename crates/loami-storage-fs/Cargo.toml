@@ -18,7 +18,7 @@ loami-storage-object-store = { path = "../loami-storage-object-store" }
 async-trait = "0.1"
 bytes = "1"
 futures = "0.3"
-object_store = "0.13"
+object_store = "0.14"
 
 [dev-dependencies]
 loami-storage = { path = "../loami-storage", features = ["conformance"] }
