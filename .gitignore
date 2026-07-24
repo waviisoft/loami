@@ -19,6 +19,10 @@ build/
 # mdBook build output
 docs/book/
 
+# Claude Code — commit shared project docs (.claude/agents, /commands, /skills),
+# never personal or machine-local overrides.
+.claude/settings.local.json
+
 # Environment / secrets
 .env
 .env.*

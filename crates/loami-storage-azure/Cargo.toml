@@ -18,7 +18,7 @@ loami-storage-object-store = { path = "../loami-storage-object-store" }
 async-trait = "0.1"
 bytes = "1"
 futures = "0.3"
-object_store = { version = "0.13", features = ["azure"] }
+object_store = { version = "0.14", features = ["azure"] }
 
 [dev-dependencies]
 loami-storage = { path = "../loami-storage", features = ["conformance"] }
