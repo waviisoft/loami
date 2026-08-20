@@ -816,6 +816,10 @@ dependencies = [
 ]
 
 [[package]]
+name = "loami-plugin-abi"
+version = "0.1.0"
+
+[[package]]
 name = "loami-storage"
 version = "0.1.0"
 dependencies = [
