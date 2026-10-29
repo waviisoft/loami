@@ -1,0 +1,35 @@
+[package]
+name = "loami-plugin-abi"
+version = "0.1.0"
+description = "The stable C ABI contract for Loami storage plugins: the #[repr(C)] types, version negotiation, and capability constants shared by plugin hosts and plugin authors."
+rust-version = "1.80"
+edition.workspace = true
+license.workspace = true
+repository.workspace = true
+homepage.workspace = true
+authors.workspace = true
+
+# NOTE: deliberately *not* `[lints] workspace = true`.
+#
+# The workspace sets `unsafe_code = "forbid"`, and `forbid` cannot be relaxed by an inner attribute
+# or by a more permissive setting further in — it is absolute. This crate is one of three planned
+# FFI carve-outs (with `loami-plugin-host` and `loami-plugin-sdk`) that must be able to name
+# `unsafe` function types and, in the other two, write `unsafe` blocks. Rather than weaken the
+# workspace bar for everyone, the carve-out crates opt down to `allow` locally and restate every
+# other workspace lint verbatim, so the rest of the bar stays exactly as high.
+#
+# This crate itself contains no `unsafe` blocks and no `unsafe fn` definitions: it is pure type and
+# constant definitions. The allowance exists because the C function *pointer types* it declares are
+# `unsafe extern "C"`, and to keep the three FFI crates configured identically.
+[lints.rust]
+unsafe_code = "allow"
+missing_docs = "warn"
+
+[lints.clippy]
+all = "warn"
+
+# Intentionally empty. The ABI contract is the one crate in the workspace that must stay
+# dependency-free: it is `#![no_std]` and uses only `core::ffi`, so any consumer — the host, an
+# out-of-tree plugin author, a `cbindgen` run, a future non-Rust binding — can depend on it without
+# inheriting a single transitive package.
+[dependencies]
